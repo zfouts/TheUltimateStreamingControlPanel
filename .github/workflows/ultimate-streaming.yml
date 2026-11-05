@@ -1,0 +1,99 @@
+name: ultimate-streaming
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ultimate-streaming
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Python packages (what the README gets from the distro)
+        run: python -m pip install PyYAML==6.0.3 requests==2.32.5 Pillow==12.0.0
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libhidapi-hidraw0 fontconfig fonts-dejavu-core fonts-noto-color-emoji
+      - name: Fetch pinned, hash-checked dependencies
+        run: python tools/fetch_deps.py
+      - name: Tests
+        run: python -m unittest discover -s tests -t . -v
+      - name: Preview sheets render for every model
+        run: python tools/preview.py --config config.example.yaml --out "$RUNNER_TEMP/preview"
+      - name: OBS scene builder reads the example config
+        run: python obs/build_scenes.py --config config.example.yaml --print-config
+
+  install:
+    # A real install, uninstall and purge in a throw-away HOME (install.sh fetches into the checkout's vendor/).
+    runs-on: ubuntu-24.04
+    env:
+      US_FULL_INSTALL_TEST: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libhidapi-hidraw0 fontconfig fonts-dejavu-core fonts-noto-color-emoji
+      - name: Install
+        run: |
+          H=$(mktemp -d)
+          echo "H=$H" >> "$GITHUB_ENV"
+          HOME=$H XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_STATE_HOME= bash ultimate-streaming/install.sh --no-service
+      - name: Installed files exist and the app starts
+        run: |
+          test -f "$H/.config/ultimate-streaming/config.yaml"
+          test -f "$H/.local/share/applications/ultimate-streaming.desktop"
+          test -d ultimate-streaming/vendor
+          HOME=$H python3 ultimate-streaming/main.py --version
+      - name: Uninstall keeps data, purge removes it
+        run: |
+          HOME=$H XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_STATE_HOME= bash ultimate-streaming/install.sh --uninstall
+          test ! -e "$H/.local/share/applications/ultimate-streaming.desktop"
+          test -d "$H/.config/ultimate-streaming"
+          HOME=$H XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_STATE_HOME= bash ultimate-streaming/install.sh --purge --yes
+          test ! -e "$H/.config/ultimate-streaming"
+      - name: Same flow as the opt-in unit test
+        working-directory: ultimate-streaming
+        run: python -m unittest tests.test_install_sh -v
+
+  shellcheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: shellcheck ultimate-streaming/install.sh
+
+  panel:
+    # The web control panel: plain ES modules, no build step.
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ultimate-streaming
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: JavaScript parses
+        run: for f in editor/js/*.js; do node --check "$f"; done
+      - name: No HTML injection sinks (chat and OBS text must go through textContent)
+        run: |
+          if grep -rnE "innerHTML|insertAdjacentHTML|outerHTML|document\.write" editor/js; then
+            echo "::error::use h()/textContent instead of HTML sinks"; exit 1; fi

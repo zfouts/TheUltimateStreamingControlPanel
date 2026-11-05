@@ -1,0 +1,11 @@
+The Ultimate Streaming Control Panel for Linux
+Copyright 2026 Zachary Fouts
+
+This product includes software developed by Zachary Fouts
+(https://github.com/zfouts/TheUltimateStreamingControlPanel).
+
+Licensed under the Apache License, Version 2.0 (see the LICENSE file).
+
+Third-party Python packages used by ultimate-streaming are not included in this
+repository; they are downloaded at install time and keep their own licenses:
+streamdeck (MIT), obsws-python (GPL-3.0), websocket-client (Apache-2.0).

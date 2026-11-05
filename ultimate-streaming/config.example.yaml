@@ -1,0 +1,552 @@
+# The Ultimate Streaming Control Panel for Linux: config. install.sh copies this to ~/.config/ultimate-streaming/config.yaml.
+#
+# The easy way to change it is the web editor:  python3 main.py --open-editor
+# (or "The Ultimate Streaming Control Panel for Linux" in your app menu). You can also edit this file by hand;
+# saved changes are picked up live. Note: the editor rewrites the file without these comments
+# (the full reference is in README.md and this example file).
+#
+# Credentials never go in this file: tokens and passwords are read from files
+# (chmod 600) or environment variables, so this config is safe to share.
+#
+# ── Layouts ──────────────────────────────────────────────────────────────────
+# Each Stream Deck model gets its own set of pages under `layouts:`, chosen by
+#   1. the model name ("Stream Deck XL", "Stream Deck +", "Stream Deck Mini", ...)
+#   2. else the key grid as COLUMNSxROWS ("8x4", "5x3", "4x2", "3x2", "3x1")
+#   3. else top-level `pages:` if present
+#   4. else the biggest grid below that fits, centred (e.g. 8x4 on a + XL, 4x2 on a Studio)
+# `python3 tools/doctor.py` prints the model name and grid of the deck that's plugged in.
+#
+#   Model                      grid   extras
+#   Stream Deck Mini           3x2
+#   Stream Deck Original/MK.2  5x3
+#   Stream Deck Neo            4x2    2 touch keys (`touch_keys:` on a page), info screen shows the page
+#   Stream Deck XL             8x4
+#   Stream Deck +              4x2    4 dials + touch strip (`dials:` on a page)
+#   Stream Deck + XL           9x4    6 dials + touch strip
+#   Stream Deck Studio         16x2   2 dials
+#   Stream Deck Pedal          3x1    no display; actions only
+#
+# A page is either a list of rows (each a list of keys; `-` = blank key) or
+# {keys: [rows...], dials: [...], touch_keys: [...]} for dials (+ models) and the Neo's touch keys.
+# A key in a row is either written out in full ({label: ..., action: ...}) or the name of a
+# saved key from `keys:` below. {use: name, label: Other} reuses a saved key with changes.
+#
+# ── Key fields ───────────────────────────────────────────────────────────────
+#   label:  text (use \n to force a line break)        size: starting font size (e.g. 30 for a clock)
+#   icon:   app icon name (steam, firefox, ...), a path, a file in ./icons/, or "emoji:🎮"
+#   bg/fg:  background / text colour
+#   action: one action, or a list of actions run in order
+#   state:  makes the key a live toggle; when true, fields in `active:` override the look
+#   active: e.g. {bg: "#c00", label: "LIVE"}
+#   confirm: true (or "text")       needs a second press within 3s (for go-live, ads, ...)
+#   display: {source: obs_uptime | obs_health | twitch_viewers | countdown | clock | radio, every: 2}
+#
+# ── Actions ──────────────────────────────────────────────────────────────────
+#   run: "shell command"            launch something (detached)
+#   keys: "ctrl+shift+m"            press a combo in the focused window (or a list of combos)
+#   hold: "ctrl+shift+alt+t"        hold a combo while the key is held (push-to-talk)
+#   type: "some text"               type text
+#   delay: 0.5                      wait (useful inside action lists)
+#   page: name | back               switch page
+#   media: play_pause|next|previous|stop
+#   volume: up|down|mute|50%        default output;   mic: mute  (toggles default input)
+#   brightness: cycle|up|down|sleep|0-100   (sleep toggles the deck dark and back)
+#   obs: ToggleRecord               any obs-websocket request; or {request: X, data: {...}}
+#   obs_scene: "Scene name"   obs_mute: "Mic/Aux"   obs_studio: toggle   obs_screenshot: ~/Pictures
+#   {scene_slot: 3}                 placeholder that becomes a key for OBS's 3rd scene
+#   ha: {service: light.toggle, entity_id: light.office, data: {...}}
+#   http: {url: ..., method: POST, json: {...}, headers: {...}}
+#   notify: "message"
+#   steam: library | bigpicture | friends | downloads | screenshots | store | {run: <appid>}
+#   {steam_game_slot: 1}            placeholder: launch key for your most recently played game
+#   brb_poll: 0 | {question, options}   brb_guess: start   brb_game: end|clear|next   brb_hype: reset|fill
+#   brb_video: next
+#   radio: next | next_station | prev_station | toggle | on | off | {station: Name}
+#   {station_slot: 3}               placeholder: key for the 3rd radio station folder
+#   countdown: 300 | "5:00" | stop  on-screen countdown (OBS "Countdown" text)
+#   countdown_toggle: {seconds: 300, scene: Starting Soon}   start (and switch scene), or stop
+#   twitch: login | clip | marker | stream_info     twitch_ad: 60
+#   obs_color: {source: "Background", color: purple}   a colour source's colour (#rgb, #rrggbb or a CSS name)
+#   ha_light: {entity_id: light.desk, color: "#9146FF", brightness: 200}   or  {entity_id: light.desk, off: true}
+#   twitch_bot: on|off|toggle   bot_timer: <timer id> (post it now)   bot_timers: pause|resume|toggle
+#   announce_now: now               post the go-live announcement now (see announce: below)
+#   twitch_chat: emote|followers|slow|subs|unique   twitch_open: chat | dashboard | channel
+#
+# ── States ───────────────────────────────────────────────────────────────────
+#   {audio: muted | mic_muted}   {media: playing}   {cmd: "shell test", every: 2} (exit 0 = on)
+#   {obs: record | stream | replay | virtualcam | studio}   {obs_scene: "Name"}   {obs_muted: "Mic/Aux"}
+#   {ha: light.office, equals: "on"}   {twitch_chat: emote|...}   {twitch: linked}   {chat: connected}
+#   {twitch_bot: on}   {bot_timers: running}
+#
+# ── Dials (Stream Deck +, + XL, Studio) ─────────────────────────────────────
+#   dials: [{label: Volume, left: {volume: down}, right: {volume: up}, press: {volume: mute}}, ...]
+#   Tapping the touch strip above a dial is the same as pressing it.
+
+version: 1         # config format version; leave as is
+brightness: 60
+start_page: main
+
+# Several decks plugged in? All of them run at once; give each its own name, layout, start page and
+# brightness by serial (Settings → Decks in the panel writes this for you):
+# devices:
+#   XXXXXXXXXXXX: {name: "Main XL", brightness: 60, start_page: main}
+#   YYYYYYYYYYYY: {name: "Mini", layout: "Stream Deck Mini", start_page: home}
+# device: {serial: "XXXXXXXXXXXX"}          # optional: drive ONLY this deck (or {model: "Stream Deck XL"})
+
+# editor: {port: 8765}                      # web editor (127.0.0.1 only); enabled: false turns it off
+
+# font: "DejaVu Sans:bold"                  # fontconfig name or a .ttf path
+# emoji_font: "Noto Color Emoji"
+
+# ── Integrations ─────────────────────────────────────────────────────────────
+
+obs: {}   # same machine: port/password come from OBS's own websocket settings automatically
+# obs:                                      # OBS on another machine:
+#   host: 192.168.1.20
+#   port: 4455
+#   password_file: ~/.config/ultimate-streaming/obs_password    # or env OBS_WEBSOCKET_PASSWORD
+
+twitch:
+  # Your Twitch username (or env TWITCH_CHANNEL): chat feed, chat / dashboard / channel links.
+  channel: ""
+  # Client ID of your own Twitch app (or env TWITCH_CLIENT_ID); see README → Twitch.
+  # Easiest: set both on the control panel's Twitch page and link your account there
+  # (or press a "Link Twitch" deck key). The login token is stored in
+  # ~/.config/ultimate-streaming/twitch.json (mode 600), never here.
+  client_id: ""
+  slow_mode_seconds: 30
+
+# home_assistant:                           # optional; see README → Home Assistant
+#   url: http://homeassistant.local:8123    # or env HA_URL
+#   token_file: ~/.config/ultimate-streaming/ha_token   # long-lived access token, chmod 600 (or env HA_TOKEN)
+
+# ── Twitch Bot ───────────────────────────────────────────────────────────────
+# Scheduled chat messages, !commands and channel-point rewards that run deck actions.
+# It posts as your own linked Twitch account. Needs Twitch linked (with the
+# channel:manage:redemptions permission: link once more if the panel asks) and `enabled: true`.
+# The Twitch Bot view in the control panel edits all of this; see README → Twitch Bot.
+# Placeholders in chat text: {channel} {uptime} {game} {title} {count} (timers); plus {user}
+# (commands); plus {color} (reward replies). Chat text can't start with ! or /.
+# A viewer's reward text is never posted. It is only used as a colour: {input} may be the
+# whole `color` of obs_color / ha_light, and the reward then needs input_required: true.
+# Rewards may only run obs_scene, obs_color, obs_mute, ha_light, notify, countdown, delay (max 30 s),
+# radio, media and page, unless the reward sets allow_unsafe_actions: true.
+# twitch_bot:
+#   enabled: true
+#   only_when_live: true              # timers post only while you are live
+#   # Chat stats (counts and names only, never message text) behind !stats and !top10.
+#   # Stored in ~/.config/ultimate-streaming/chatstats.db unless you give another database here
+#   # (any SQLAlchemy URL; its driver, e.g. psycopg, must be installed; stays out of the panel):
+#   # database_url: "postgresql+psycopg://user:password@localhost/streaming"
+#   stats:
+#     enabled: true
+#     include_broadcaster: false      # true counts your own chat lines too
+#     exclude: [nightbot, streamelements, streamlabs, moobot, fossabot]   # bot accounts to ignore
+#   timers:
+#     - id: follow
+#       messages:                     # 1 to 20, posted in turn
+#         - "Enjoying {channel}? Hit follow so you don't miss the next stream!"
+#       interval_minutes: 20          # 2 to 240 (default 15)
+#       min_chat_lines: 5             # chat lines needed since its last post (0 to 1000, default 5)
+#       announce: false               # true posts it as a coloured announcement
+#       color: primary                # primary, blue, green, orange or purple
+#   # Leave `commands:` out entirely to get the default commands (!commands !uptime !game !title
+#   # !stats !top10 !lurk !unlurk, and !discord !socials !schedule !specs switched off).
+#   # Writing a `commands:` list means only your commands exist.
+#   commands:
+#     - id: stats
+#       trigger: "!stats"
+#       builtin: stats                # stats, top10, uptime or commands; fills in live data
+#       response: "{user}: {messages} messages (#{rank}), {stream_messages} this stream."
+#       missing_response: "{user}, no stats yet. Say hi!"
+#       user_cooldown_seconds: 30
+#     - id: discord
+#       trigger: "!discord"           # ! then 1 to 25 of a-z, 0-9 or _
+#       aliases: ["!chat"]            # up to 5 more triggers
+#       response: "Join us at discord.example.com, {user}!"
+#       permission: everyone          # everyone, subscriber, vip, moderator or broadcaster
+#       cooldown_seconds: 30          # 0 to 3600, for everyone
+#       user_cooldown_seconds: 0      # 0 to 86400, per person
+#       reply: true                   # reply to the viewer's message
+#   rewards:
+#     - id: bgcolor
+#       title: "Change the background"      # up to 45 characters, unique on your channel
+#       cost: 500
+#       prompt: "Type a colour: purple, #ff8800, teal..."
+#       input_required: true                # the viewer types the colour
+#       actions:
+#         - obs_color: {source: "Background", color: "{input}"}
+#       revert_after_seconds: 300           # put it back after 5 minutes (0 = never)
+#       revert:
+#         - obs_color: {source: "Background", color: "#1a1a2e"}
+#       reply: "{user} turned the background {color}!"
+#     - id: party
+#       title: "Party lights"
+#       cost: 1000
+#       global_cooldown_seconds: 600
+#       actions:
+#         - ha_light: {entity_id: light.desk, color: magenta, brightness: 255}
+#         - ha_light: {entity_id: light.shelf, color: "#00e5ff"}
+#       revert_after_seconds: 60
+#       revert:
+#         - ha_light: {entity_id: light.desk, color: white}
+#         - ha_light: {entity_id: light.shelf, color: white}
+#       reply: "Party time, thanks {user}!"
+
+# ── Discord webhooks ─────────────────────────────────────────────────────────
+# The Discord channels your features post to (go-live announcements, plugins such as Bambu).
+# Settings → Discord in the control panel edits this and is where you paste each webhook URL:
+# URLs are kept in ~/.config/ultimate-streaming/discord_webhooks.json (mode 600), never here.
+# Features pick a webhook by its id. See README → Discord webhooks.
+# discord:
+#   webhooks:                         # up to 20
+#     - id: golive                    # a-z, 0-9, _ or -; unique
+#       name: Go-live channel         # up to 40 characters; unique
+
+# ── Go-live announcements ────────────────────────────────────────────────────
+# Posts to Discord when Twitch says you went live (needs Twitch linked and the Twitch Bot
+# on, which runs the EventSub connection). The Announcements view in the control panel edits
+# this. Each destination picks one of the webhooks above (Settings → Discord).
+# Placeholders: {channel} {title} {game} {url}. See README → Go-live announcements.
+# announce:
+#   enabled: true
+#   cooldown: 30                      # minutes: going live again this soon isn't announced again (0-1440)
+#   destinations:                     # up to 10
+#     - id: main                      # a-z, 0-9, _ or -; unique
+#       name: My Discord
+#       webhook: golive               # the id of a webhook under discord: above
+#       enabled: true
+#       message: "{channel} is live! {title}\n{url}"   # up to 1500 characters; Discord markdown works
+#       embed: true                   # add a card with the title, game, link and stream preview
+#       ping: none                    # none, everyone, here or role:<role id>
+
+# ── Twitch alerts ────────────────────────────────────────────────────────────
+# On-stream alerts for follows, subs, resubs, gifted subs, cheers and raids: text in
+# ~/.config/ultimate-streaming/overlay/alert.txt (the "Alert" source the scene builder adds),
+# plus latest_follower.txt, latest_sub.txt, latest_cheer.txt and latest_raid.txt. Needs Twitch
+# linked, re-linked once for the new permissions (raids work without). On by default; you only
+# need this section to change something. See README → Twitch alerts.
+# alerts:
+#   enabled: true
+#   show_seconds: 6                   # 2-30
+#   show_message: false               # show a resub's or cheer's message as a second line
+#   text:                             # {user} {months} {total} {bits} {viewers} {tier}; up to 300 characters
+#     follow: "{user} just followed!"
+#     sub: "{user} just subscribed!"
+#     resub: "{user} resubscribed for {months} months!"
+#     gift: "{user} gifted {total} subs!"
+#     cheer: "{user} cheered {bits} bits!"
+#     raid: "{user} is raiding with {viewers} viewers!"
+#   storm:                            # a flood of events becomes one counted alert, no names, no chat
+#     window_seconds: 30              # 5-600
+#     follows: 5                      # more follows than this in the window (1-1000)
+#     others: 3                       # more subs, gifts, cheers or raids than this (1-1000)
+#     text: {follow: "{count} new followers!", sub: "{count} new subs!", raid: "{count} raids!"}
+#   chat:                             # thank-yous in chat; "" (the default) says nothing
+#     follow: "Thanks for the follow, {user}!"
+#     raid: "Welcome raiders from {user}!"
+#   hype:                             # points added to the BRB hype meter (0-100 each)
+#     follow: 3
+#     sub: 10
+#     resub: 10
+#     gift_per_sub: 4
+#     cheer_per_100_bits: 5
+#     raid_per_10_viewers: 1
+#     max_per_event: 20
+#   shoutout:                         # shout out raiders automatically while live
+#     on_raid: false
+#     min_viewers: 10
+#     allow: []                       # only these Twitch logins, if not empty
+#     deny: []                        # never these
+#   blocklist: []                     # words to hide ("Someone" is shown instead); "re:<pattern>" is a regex
+
+brb:
+  scene: BRB
+  chat_lines: 7
+  media_dir: ~/Stream/brb         # put videos in videos/ inside it; they loop on the BRB screen
+  highlights_count: 0             # set >0 to also add that many of your newest saved replays
+  highlights_dir: ~/Videos/Stream # where OBS saves replays (obs_setup.recordings_dir)
+  polls:                          # started from the BRB page; viewers vote with !1, !2, ...
+    - {question: "What should we do next?", options: [Keep going, Try something new, Viewer's choice]}
+    - {question: "How's the stream looking?", options: [Great, Fine, Needs work]}
+
+radio:
+  dir: ~/Stream/radio             # every folder in here is a station (needs a "BRB Music" media source)
+  # default_station: Lofi
+
+# steam:
+#   hide: [123456]                # app ids to leave off the deck
+
+# overlay:                        # wording of the on-screen timers
+#   timers:
+#     countdown: {format: "Starting in {}", done: "Starting now!", idle: "Get comfy, we're about to start"}
+
+# Used by obs/build_scenes.py, which creates the OBS profile and scenes (see README → Set up OBS).
+obs_setup:
+  # mode: adopt                   # adopt: keep OBS's current profile + collection, build nothing;
+                                  # starter: build the profile + collection below. Unset: adopt if OBS
+                                  # has any profile besides "Untitled", else starter
+  profile: Stream Deck            # created if missing; an existing profile is never modified
+  collection: Stream Deck         # created new; existing collections are never touched
+  canvas: [1920, 1080]
+  fps: 60
+  encoder: x264                   # x264 (CPU, works everywhere) | nvenc (NVIDIA) | qsv (Intel) | amd
+  bitrate: 6000                   # kbps
+  recordings_dir: ~/Videos/Stream
+  replay_buffer_seconds: 60       # 0 = off
+  screen: 0                       # monitor to capture (X11; on Wayland OBS asks)
+  screen_crop: {left: 0, right: 0, top: 0, bottom: 0}   # e.g. show the middle of an ultrawide
+  webcam: /dev/video0
+
+# ── Shared key definitions (referenced below as name) ──────────────────────
+
+keys:
+  # navigation
+  to_twitch: {label: Twitch, icon: "emoji:📺", bg: "#1f1f24", action: {page: twitch}}
+  to_steam: {label: Steam, icon: steam, bg: "#1f1f24", action: {page: steam}}
+  to_scenes: {label: Scenes, icon: "emoji:🎥", bg: "#203050", action: {page: scenes}}
+  to_chat: {label: Chat & ads, icon: "emoji:💬", bg: "#3a2d5c", action: {page: chat}}
+  to_brb: {label: BRB controls, icon: "emoji:🎮", bg: "#7d2d2d", action: {page: brb}}
+  to_radio: {label: Radio, icon: "emoji:📻", bg: "#3a2d5c", action: {page: radio}, display: {source: radio, every: 2}}
+  back: {label: Back, icon: "emoji:↩️", bg: "#444444", action: {page: back}}
+
+  # PC
+  time: {label: Time, size: 30, bg: "#1f1f24", display: {source: clock, show: time, every: 5}}
+  date: {label: Date, size: 22, bg: "#1f1f24", fg: "#bf94ff", display: {source: clock, show: date, every: 60}}
+  prev: {label: Prev, icon: "emoji:⏮️", bg: "#1f1f24", action: {media: previous}}
+  play: {label: Play, icon: "emoji:▶️", bg: "#1f1f24", action: {media: play_pause},
+               state: {media: playing}, active: {label: Pause, icon: "emoji:⏸️", bg: "#106040"}}
+  next: {label: Next, icon: "emoji:⏭️", bg: "#1f1f24", action: {media: next}}
+  vol_down: {label: Vol -, icon: "emoji:🔉", bg: "#1f1f24", action: {volume: down}}
+  vol_up: {label: Vol +, icon: "emoji:🔊", bg: "#1f1f24", action: {volume: up}}
+  mute: {label: Mute, icon: "emoji:🔈", bg: "#1f1f24", action: {volume: mute},
+               state: {audio: muted}, active: {label: Muted, icon: "emoji:🔇", bg: "#a01818"}}
+  mic: {label: Mic, icon: "emoji:🎙️", bg: "#1f1f24", action: {mic: mute},
+             state: {audio: mic_muted, every: 1}, active: {label: Mic muted, bg: "#a01818"}}
+  # Print opens the desktop's screenshot tool on GNOME, KDE, MATE, Xfce and Cinnamon.
+  snip: {label: Snip, icon: "emoji:✂️", bg: "#1f1f24", action: {keys: Print}}
+  lock: {label: Lock, icon: "emoji:🔒", bg: "#1f1f24", action: {run: "loginctl lock-session"}}
+  sleep: {label: Sleep, icon: "emoji:🌙", bg: "#1f1f24", action: {brightness: sleep}}
+  # Workspace switching: ctrl+alt+arrow on GNOME/MATE/Xfce/Cinnamon; change for KDE (ctrl+F1...).
+  desk_left: {label: Desktop, icon: "emoji:⬅️", bg: "#1f1f24", action: {keys: "ctrl+alt+Left"}}
+  desk_right: {label: Desktop, icon: "emoji:➡️", bg: "#1f1f24", action: {keys: "ctrl+alt+Right"}}
+
+  # broadcast (OBS)
+  go_live: {label: Go live, icon: "emoji:🔴", bg: "#333333", action: {obs: ToggleStream}, confirm: true,
+                     state: {obs: stream, every: 1}, active: {bg: "#c01010", label: LIVE},
+                     display: {source: obs_uptime, every: 1}}
+  health: {label: Stream health, icon: "emoji:📶", bg: "#333333", display: {source: obs_health, every: 2}}
+  viewers: {label: Viewers, icon: "emoji:👀", bg: "#333333", action: {twitch_open: channel},
+                     display: {source: twitch_viewers, every: 30}}
+  record: {label: Record, icon: "emoji:⏺️", bg: "#333333", action: {obs: ToggleRecord},
+                   state: {obs: record, every: 1}, active: {label: REC, bg: "#c01010"}}
+  pause_rec: {label: Pause rec, icon: "emoji:⏸️", bg: "#333333", action: {obs: ToggleRecordPause}}
+  save_replay: {label: Save replay, icon: "emoji:💾", bg: "#333333", action: {obs: SaveReplayBuffer}}
+  replay_buffer: {label: Replay buffer, icon: "emoji:🔁", bg: "#333333", action: {obs: ToggleReplayBuffer},
+                                 state: {obs: replay, every: 2}, active: {label: Replay on, bg: "#106040"}}
+  # "Mic/Aux" and "Desktop Audio" are OBS's default audio device names (Settings → Audio).
+  obs_mic: {label: Mic, icon: "emoji:🎙️", bg: "#103040", action: {obs_mute: Mic/Aux},
+                     state: {obs_muted: Mic/Aux, every: 1}, active: {label: Mic muted, bg: "#a01818"}}
+  obs_desktop: {label: Desktop, icon: "emoji:🔊", bg: "#103040", action: {obs_mute: Desktop Audio},
+                             state: {obs_muted: Desktop Audio, every: 1},
+                             active: {label: Desktop muted, icon: "emoji:🔇", bg: "#a01818"}}
+  # Use `run: "flatpak run com.obsproject.Studio"` for Flatpak OBS.
+  open_obs: {label: Open OBS, icon: com.obsproject.Studio, bg: "#302e31", action: {run: obs}}
+  start_in_5: {label: Start in 5:00, icon: "emoji:⏳", bg: "#9147ff",
+                           action: {countdown_toggle: {seconds: 300, scene: Starting Soon}},
+                           display: {source: countdown, every: 1}}
+  go_brb: {label: Go BRB, icon: "emoji:☕", bg: "#7d2d2d",
+                   action: [{obs: {request: SetInputMute, data: {inputName: Mic/Aux, inputMuted: true}}},
+                            {obs: {request: SetInputMute, data: {inputName: Desktop Audio, inputMuted: true}}},
+                            {obs_scene: BRB}, {countdown: {name: brb_timer, seconds: 900}}, {page: brb}]}
+
+  # Twitch
+  marker: {label: Marker, icon: "emoji:📍", bg: "#6441a5", action: {twitch: marker}}
+  clip: {label: Clip, icon: "emoji:🎬", bg: "#6441a5", action: {twitch: clip}}
+  emote: {label: Emote only, icon: "emoji:😀", bg: "#3a2d5c", action: {twitch_chat: emote},
+                 state: {twitch_chat: emote, every: 5}, active: {bg: "#9147ff"}}
+  followers: {label: Follower only, icon: "emoji:💜", bg: "#3a2d5c", action: {twitch_chat: followers},
+                         state: {twitch_chat: followers, every: 5}, active: {bg: "#9147ff"}}
+  slow: {label: Slow mode, icon: "emoji:🐢", bg: "#3a2d5c", action: {twitch_chat: slow},
+               state: {twitch_chat: slow, every: 5}, active: {bg: "#9147ff"}}
+  subs: {label: Sub only, icon: "emoji:⭐", bg: "#3a2d5c", action: {twitch_chat: subs},
+               state: {twitch_chat: subs, every: 5}, active: {bg: "#9147ff"}}
+  ad: {label: Ad 60s, icon: "emoji:💰", bg: "#5c4a1a", action: {twitch_ad: 60}, confirm: true}
+  chat_window: {label: Chat, icon: "emoji:💬", bg: "#6441a5", action: {twitch_open: chat}}
+  dashboard: {label: Stream manager, icon: "emoji:🛠️", bg: "#6441a5", action: {twitch_open: dashboard}}
+  stream_info: {label: Stream info, icon: "emoji:✏️", bg: "#9147ff", action: {twitch: stream_info}}
+  link_twitch: {label: Link Twitch, icon: "emoji:🔗", bg: "#6441a5", action: {twitch: login},
+                             state: {twitch: linked, every: 5}, active: {label: Twitch linked, bg: "#2d7d46"}}
+
+  # BRB screen
+  brb_on: {label: Go BRB, icon: "emoji:☕", bg: "#7d2d2d",
+                   action: [{obs: {request: SetInputMute, data: {inputName: Mic/Aux, inputMuted: true}}},
+                            {obs: {request: SetInputMute, data: {inputName: Desktop Audio, inputMuted: true}}},
+                            {obs_scene: BRB}, {countdown: {name: brb_timer, seconds: 900}}],
+                   state: {obs_scene: BRB}, active: {label: On BRB, bg: "#c01010"}}
+  back_15: {label: Back in 15:00, icon: "emoji:⏳", bg: "#9147ff",
+                     action: {countdown_toggle: {name: brb_timer, seconds: 900}},
+                     display: {source: countdown, timer: brb_timer, every: 1}}
+  back_5: {label: Back in 5:00, icon: "emoji:⏳", bg: "#9147ff", action: {countdown: {name: brb_timer, seconds: 300}}}
+  back_10: {label: Back in 10:00, icon: "emoji:⏳", bg: "#9147ff", action: {countdown: {name: brb_timer, seconds: 600}}}
+  im_back: {label: "I'm back", icon: "emoji:👋", bg: "#2d7d46",
+                     action: [{brb_game: end}, {countdown: {name: brb_timer, stop: true}},
+                              {obs: {request: SetInputMute, data: {inputName: Mic/Aux, inputMuted: false}}},
+                              {obs: {request: SetInputMute, data: {inputName: Desktop Audio, inputMuted: false}}},
+                              {obs_scene: Screen}, {page: back}]}
+  poll_1: {label: Poll 1, icon: "emoji:🗳️", bg: "#3a2d5c", action: {brb_poll: 0}}
+  poll_2: {label: Poll 2, icon: "emoji:🗳️", bg: "#3a2d5c", action: {brb_poll: 1}}
+  guess: {label: Guess game, icon: "emoji:⏱️", bg: "#3a2d5c", action: {brb_guess: start}}
+  game: {label: No game, icon: "emoji:🎲", bg: "#4e5058", action: {brb_game: next}, display: {source: brb_game, every: 1}}
+  hype: {label: Hype, icon: "emoji:🔥", bg: "#3a2d5c", action: {brb_hype: reset}, display: {source: brb_hype, every: 1}}
+  test_hype: {label: Test hype, icon: "emoji:🧪", bg: "#4e5058", action: {brb_hype: fill}}
+  next_video: {label: Next video, icon: "emoji:🎞️", bg: "#103040", action: {brb_video: next}}
+  chat_status: {label: Chat offline, icon: "emoji:💬", bg: "#4e5058", state: {chat: connected, every: 5},
+                             active: {label: Chat connected, bg: "#2d7d46"}}
+
+  # radio
+  prev_station: {label: Prev station, icon: "emoji:⏮️", bg: "#103040", action: {radio: prev_station}}
+  next_station: {label: Next station, icon: "emoji:⏭️", bg: "#103040", action: {radio: next_station}}
+  skip_track: {label: Skip track, icon: "emoji:🎵", bg: "#103040", action: {radio: next},
+                           display: {source: radio, track: true, every: 2}}
+  radio_toggle: {label: Radio, icon: "emoji:📻", bg: "#a01818", action: {radio: toggle},
+                               state: {radio: "on", every: 1}, active: {label: Radio on, bg: "#2d7d46"}}
+
+  # Steam
+  library: {label: Library, icon: steam, bg: "#1b2838", action: {steam: library}}
+  bigpicture: {label: Big Picture, icon: "emoji:🖥️", bg: "#1b2838", action: {steam: bigpicture}}
+  friends: {label: Friends, icon: "emoji:👥", bg: "#1b2838", action: {steam: friends}}
+  downloads: {label: Downloads, icon: "emoji:⬇️", bg: "#1b2838", action: {steam: downloads}}
+  screenshots: {label: Screenshots, icon: "emoji:🖼️", bg: "#1b2838", action: {steam: screenshots}}
+  store: {label: Store, icon: "emoji:🛒", bg: "#1b2838", action: {steam: store}}
+  overlay: {label: Overlay, icon: "emoji:🎮", bg: "#3a2a10", action: {keys: "shift+tab"}}
+  steam_shot: {label: Screenshot, icon: "emoji:📸", bg: "#3a2a10", action: {keys: F12}}
+
+  # dials (Stream Deck +)
+  dial_volume: {label: "Volume\npress: mute", left: {volume: down}, right: {volume: up}, press: {volume: mute}}
+  dial_media: {label: "Track\npress: play/pause", left: {media: previous}, right: {media: next}, press: {media: play_pause}}
+  dial_bright: {label: "Brightness\npress: sleep", left: {brightness: down}, right: {brightness: up}, press: {brightness: sleep}}
+  dial_desktop: {label: "Desktop\npress: lock", left: {keys: "ctrl+alt+Left"}, right: {keys: "ctrl+alt+Right"},
+                               press: {run: "loginctl lock-session"}}
+  dial_obs_mic: {label: "press:\nmute mic", press: {obs_mute: Mic/Aux}}
+  dial_obs_desktop: {label: "press:\nmute desktop", press: {obs_mute: Desktop Audio}}
+
+# ── Layouts ─────────────────────────────────────────────────────────────────
+
+layouts:
+
+  # Stream Deck XL (and + XL, centred)
+  8x4:
+    main:   # navigation and PC controls only; streaming lives on the Twitch page
+      - [-, -, -, to_twitch, to_steam, -, -, -]
+      - [-, -, -, time, date, -, -, -]
+      - [-, prev, play, next, vol_down, vol_up, mute, -]
+      - [desk_left, -, mic, snip, lock, sleep, -, desk_right]
+    twitch:
+      - [go_live, health, viewers, record, pause_rec, save_replay, marker, clip]
+      - [obs_mic, obs_desktop, emote, followers, slow, subs, ad, to_radio]
+      - [{scene_slot: 1}, {scene_slot: 2}, {scene_slot: 3}, {scene_slot: 4}, {scene_slot: 5}, {scene_slot: 6},
+         start_in_5, go_brb]
+      - [chat_window, dashboard, open_obs, stream_info, to_brb, link_twitch, replay_buffer, back]
+    brb:
+      - [brb_on, back_15, back_5, back_10, -, -, -, im_back]
+      - [poll_1, poll_2, guess, game, -, -, -, -]
+      - [hype, test_hype, -, -, -, next_video, obs_mic, -]
+      - [chat_status, -, -, -, -, -, -, back]
+    radio:
+      - [{station_slot: 1}, {station_slot: 2}, {station_slot: 3}, {station_slot: 4},
+         {station_slot: 5}, {station_slot: 6}, {station_slot: 7}, {station_slot: 8}]
+      - [{station_slot: 9}, {station_slot: 10}, {station_slot: 11}, {station_slot: 12},
+         {station_slot: 13}, {station_slot: 14}, {station_slot: 15}, {station_slot: 16}]
+      - [prev_station, next_station, skip_track, radio_toggle]
+      - [-, -, -, -, -, -, -, back]
+    steam:
+      - [library, bigpicture, friends, downloads, screenshots, store, overlay, steam_shot]
+      - [{steam_game_slot: 1}, {steam_game_slot: 2}, {steam_game_slot: 3}, {steam_game_slot: 4},
+         {steam_game_slot: 5}, {steam_game_slot: 6}, {steam_game_slot: 7}, {steam_game_slot: 8}]
+      - [{steam_game_slot: 9}, {steam_game_slot: 10}, {steam_game_slot: 11}, {steam_game_slot: 12},
+         {steam_game_slot: 13}, {steam_game_slot: 14}, {steam_game_slot: 15}, {steam_game_slot: 16}]
+      - [-, -, -, -, -, -, -, back]
+
+  # Stream Deck Original / MK.2 (15 keys)
+  5x3:
+    main:
+      - [desk_left, to_twitch, time, to_steam, desk_right]
+      - [prev, play, next, vol_down, vol_up]
+      - [mic, snip, lock, mute, sleep]
+    twitch:
+      - [go_live, health, record, marker, clip]
+      - [obs_mic, obs_desktop, start_in_5, go_brb, save_replay]
+      - [to_scenes, to_chat, stream_info, link_twitch, back]
+    scenes:
+      - [{scene_slot: 1}, {scene_slot: 2}, {scene_slot: 3}, {scene_slot: 4}, {scene_slot: 5}]
+      - [{scene_slot: 6}, viewers, replay_buffer, pause_rec, open_obs]
+      - [-, -, -, -, back]
+    chat:
+      - [emote, followers, slow, subs, ad]
+      - [chat_window, dashboard, to_radio, to_brb, -]
+      - [-, -, -, -, back]
+    brb:
+      - [brb_on, back_15, back_5, back_10, im_back]
+      - [poll_1, poll_2, guess, game, hype]
+      - [chat_status, next_video, obs_mic, test_hype, back]
+    radio:
+      - [{station_slot: 1}, {station_slot: 2}, {station_slot: 3}, {station_slot: 4}, {station_slot: 5}]
+      - [{station_slot: 6}, {station_slot: 7}, {station_slot: 8}, {station_slot: 9}, {station_slot: 10}]
+      - [prev_station, next_station, skip_track, radio_toggle, back]
+    steam:
+      - [library, bigpicture, friends, store, overlay]
+      - [{steam_game_slot: 1}, {steam_game_slot: 2}, {steam_game_slot: 3}, {steam_game_slot: 4}, {steam_game_slot: 5}]
+      - [{steam_game_slot: 6}, {steam_game_slot: 7}, {steam_game_slot: 8}, steam_shot, back]
+
+  # Stream Deck + and Neo (8 keys). `dials:` are used on the +, `touch_keys:` on the Neo.
+  4x2:
+    main:
+      keys:
+        - [to_twitch, time, to_steam, play]
+        - [mic, mute, lock, sleep]
+      touch_keys: [vol_down, vol_up]
+      dials: [dial_volume, dial_media, dial_bright, dial_desktop]
+    twitch:
+      keys:
+        - [go_live, record, marker, clip]
+        - [obs_mic, go_brb, to_scenes, back]
+      touch_keys: [chat_window, dashboard]
+      dials: [dial_obs_mic, dial_obs_desktop, dial_volume, dial_media]
+    scenes:
+      - [{scene_slot: 1}, {scene_slot: 2}, {scene_slot: 3}, {scene_slot: 4}]
+      - [{scene_slot: 5}, start_in_5, to_chat, back]
+    chat:
+      - [emote, followers, slow, subs]
+      - [ad, link_twitch, stream_info, back]
+    brb:
+      keys:
+        - [im_back, back_15, poll_1, guess]
+        - [game, hype, next_video, obs_mic]
+      dials: [dial_obs_mic, dial_obs_desktop, dial_volume, dial_media]
+    steam:
+      - [{steam_game_slot: 1}, {steam_game_slot: 2}, {steam_game_slot: 3}, library]
+      - [{steam_game_slot: 4}, {steam_game_slot: 5}, {steam_game_slot: 6}, back]
+
+  # Stream Deck Mini (6 keys)
+  3x2:
+    main:
+      - [to_twitch, play, mic]
+      - [to_steam, mute, sleep]
+    twitch:
+      - [go_live, marker, to_scenes]
+      - [obs_mic, go_brb, back]
+    scenes:
+      - [{scene_slot: 1}, {scene_slot: 2}, {scene_slot: 3}]
+      - [{scene_slot: 4}, {scene_slot: 5}, back]
+    brb:
+      - [im_back, poll_1, game]
+      - [hype, next_video, obs_mic]
+    steam:
+      - [{steam_game_slot: 1}, {steam_game_slot: 2}, {steam_game_slot: 3}]
+      - [{steam_game_slot: 4}, library, back]
+
+  # Stream Deck Pedal (3 pedals, no display)
+  3x1:
+    main:
+      - [obs_mic, marker, clip]

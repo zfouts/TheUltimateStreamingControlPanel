@@ -1,0 +1,76 @@
+/* Plugin pages (js/plugins.js) and their sidebar entries. Tokens and components from style.css only. */
+
+/* ------------------------------------------------------------------ sidebar entries */
+.nav-plugins { display: contents; }
+.nav-rule { border: 0; border-top: 1px solid var(--line-2); margin: var(--s-3) var(--s-3) 0; }
+.nav-label {
+  margin: var(--s-3) var(--s-3) var(--s-1); font-size: var(--fs-xs); font-weight: 650;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+}
+.nav-plugins .dot { flex: none; }
+@media (max-width: 1180px) {   /* icon-only sidebar: the rule stays, the heading goes */
+  .nav-rule { width: 28px; margin: var(--s-2) auto; }
+  .nav-label { display: none; }
+  .nav-plugins .dot { position: absolute; top: 8px; right: 8px; }
+}
+@media (max-width: 820px) {    /* top bar: a short vertical rule instead */
+  .nav-rule { width: 0; height: 20px; margin: 0 var(--s-1); border-top: 0; border-left: 1px solid var(--line-2); align-self: center; flex: none; }
+  .nav-plugins .dot { position: static; }
+}
+
+/* ------------------------------------------------------------------ page */
+.plug-page { max-width: 960px; }
+.plug-title { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+.plug-title .card-icon { flex: none; }
+.plug-page .page-sub, .plug-page .page-head .hint { overflow-wrap: anywhere; }
+
+.plug-headline { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.plug-headline-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.plug-big { font-size: var(--fs-2xl); font-weight: 750; letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; }
+.plug-progress { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-4); }
+.plug-progress .progress { flex: 1; height: 8px; }
+.plug-pct { font-size: var(--fs-sm); font-weight: 650; color: var(--text-2); font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+.plug-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-3); margin-top: var(--s-4); }
+.plug-stat { padding: var(--s-3) var(--s-4); background: var(--panel-2); box-shadow: none; }
+.plug-stat .stat-value { font-size: var(--fs-lg); font-weight: 700; }
+.plug-status-card .banner { margin-top: var(--s-4); }
+.plug-waiting { display: flex; align-items: center; gap: var(--s-3); color: var(--muted); }
+.plug-waiting .ic { flex: none; }
+.plug-error { overflow-wrap: anywhere; white-space: pre-wrap; font-size: var(--fs-sm); }
+
+.plug-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.plug-actions button[disabled] { cursor: not-allowed; }
+
+/* ------------------------------------------------------------------ settings form */
+.plug-formel { display: flex; flex-direction: column; gap: var(--s-5); }
+.plug-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 var(--s-5); }
+.plug-fields > .field { margin-bottom: var(--s-4); }
+.plug-req { margin-left: var(--s-2); font-size: var(--fs-xs); font-weight: 550; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.plug-bool { justify-content: center; }
+.plug-secret-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); }
+.plug-secret-row input { flex: 1; min-width: 160px; }
+.plug-secret-row .badge { display: inline-flex; align-items: center; gap: 4px; }
+.plug-secret-row .badge .ic { width: 12px; height: 12px; }
+:root .danger-text { color: var(--bad); }
+
+.plug-savebar {
+  position: sticky; bottom: var(--s-3); z-index: 5; display: flex; flex-direction: column; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4); border: 1px solid var(--line-2); border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px); box-shadow: var(--shadow-2);
+}
+.plug-save-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); }
+.plug-save-row .hint { margin-left: auto; }
+.plug-errs { margin: var(--s-1) 0 0; padding-left: var(--s-5); }
+.plug-savebar .banner { padding: var(--s-2) var(--s-3); gap: var(--s-2); }
+
+@media (max-width: 560px) {
+  .plug-big { font-size: var(--fs-xl); }
+  .plug-save-row .hint { margin-left: 0; width: 100%; }
+  .plug-fields { grid-template-columns: minmax(0, 1fr); }
+}
+.plug-version { margin-left: var(--s-2); vertical-align: middle; font-size: var(--fs-xs); }
+.plug-secret-row { gap: var(--s-1) var(--s-2); }
+
+.plug-hook-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); }
+.plug-hook-row select { flex: 1 1 240px; min-width: 0; }
+.plug-manage { white-space: nowrap; }

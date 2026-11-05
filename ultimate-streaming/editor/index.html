@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>The Ultimate Streaming Control Panel for Linux</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/live.css">
+<link rel="stylesheet" href="css/twitch.css">
+<link rel="stylesheet" href="css/obs.css">
+<link rel="stylesheet" href="css/keys.css">
+<link rel="stylesheet" href="css/backups.css">
+<link rel="stylesheet" href="css/bot.css">
+<link rel="stylesheet" href="css/onboarding.css">
+<link rel="stylesheet" href="css/plugins.css">
+<link rel="stylesheet" href="css/announce.css">
+<link rel="stylesheet" href="css/discord.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo" aria-hidden="true"></span><span class="txt">Ultimate Streaming<span class="sub">Control panel for Linux</span></span></div>
+    <span id="nav-current" class="nav-current" aria-hidden="true"></span>
+    <nav class="nav" aria-label="Sections">
+      <button aria-label="Live" data-view="live" aria-current="page" title="Live (1)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM7.1 7.1a7 7 0 0 0 0 9.8m9.8 0a7 7 0 0 0 0-9.8M4.2 4.2a11 11 0 0 0 0 15.6m15.6 0a11 11 0 0 0 0-15.6"/></svg><span class="txt">Live</span><span class="kbd" aria-hidden="true">1</span></button>
+      <button aria-label="Deck" data-view="deck" aria-current="false" title="Deck (2)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2zM7 13h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/></svg><span class="txt">Deck</span><span class="kbd" aria-hidden="true">2</span></button>
+      <button aria-label="Twitch" data-view="twitch" aria-current="false" title="Twitch (3)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h15v11l-4 4h-4l-3 3v-3H5zM11 8v4m4-4v4"/></svg><span class="txt">Twitch</span><span class="kbd" aria-hidden="true">3</span></button>
+      <button aria-label="Twitch Bot" data-view="bot" data-parent="twitch" class="nav-sub" aria-current="false" title="Twitch Bot (4)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3zm2 6v2m6-2v2m-6 3.5h6M1.5 12v3m21-3v3"/></svg><span class="txt">Twitch Bot</span><span class="kbd" aria-hidden="true">4</span></button>
+      <button aria-label="Announcements" data-view="announce" data-parent="twitch" class="nav-sub" aria-current="false" title="Announcements"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4a1 1 0 0 0 1 1h3l8 4V5L7 9H4a1 1 0 0 0-1 1zm15.5-.5a4 4 0 0 1 0 5"/></svg><span class="txt">Announcements</span></button>
+      <button aria-label="OBS" data-view="obs" aria-current="false" title="OBS (5)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 6.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM7.8 12.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM16.2 12.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg><span class="txt">OBS</span><span class="kbd" aria-hidden="true">5</span></button>
+      <button aria-label="Settings" data-view="settings" aria-current="false" title="Settings (6)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9m4 0h3M4 12h3m4 0h9M4 18h11m4 0h1M15 4v4M9 10v4m8 2v4"/></svg><span class="txt">Settings</span><span class="kbd" aria-hidden="true">6</span></button>
+      <button aria-label="Discord" data-view="discord" data-parent="settings" class="nav-sub" aria-current="false" title="Discord webhooks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm5 6h.01M15 11h.01"/></svg><span class="txt">Discord</span></button>
+      <div id="plugin-nav" class="nav-plugins" role="group" aria-label="Plugins" hidden></div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="conn" id="conn"><span id="stream-state" class="stream-state" aria-hidden="true"></span><span class="txt" id="conn-text">Connecting…</span></div>
+      <button id="theme-toggle" class="ghost icon-btn" aria-label="Switch theme" title="Switch theme"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 13.5A8.5 8.5 0 0 1 10.5 3a8.5 8.5 0 1 0 10.5 10.5z"/></svg></button>
+    </div>
+  </aside>
+
+  <div class="content">
+    <header class="topbar">
+      <div class="chips" id="status" aria-label="Connections" aria-live="polite"></div>
+      <div class="actions" id="editor-actions" hidden>
+        <button id="undo" class="ghost icon-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+        <button id="redo" class="ghost icon-btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5m5 5H9a5 5 0 0 0 0 10h3"/></svg></button>
+        <span class="sep" aria-hidden="true"></span>
+        <button id="save" class="primary" title="Save (Ctrl+S)" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg><span class="txt">Saved</span></button>
+      </div>
+    </header>
+    <div id="conn-banner" class="conn-banner" role="status" hidden><span class="spin" aria-hidden="true"></span><span id="conn-banner-text">Reconnecting to the deck…</span></div>
+    <div id="fallback-banner" class="fallback-banner" role="alert" hidden><span id="fallback-text"></span><button id="fallback-link" class="small" type="button">Open Backups</button></div>
+
+    <main>
+      <div id="fatal" class="fatal" hidden></div>
+      <section id="view-live" class="view" aria-label="Live"></section>
+      <section id="view-deck" class="view" hidden aria-label="Deck keys">
+        <div class="page-head">
+          <div class="page-titles">
+            <h1 class="page-title">Deck</h1>
+            <p id="layout-note" class="page-sub"></p>
+          </div>
+          <div class="page-actions">
+            <label class="layout-pick"><span class="sr-only">Layout</span>
+              <select id="layout-select"></select>
+            </label>
+            <button id="layout-menu" class="icon-btn" title="Layout options" aria-label="Layout options"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"/></svg></button>
+          </div>
+        </div>
+        <div class="pagebar">
+          <div id="page-tabs" class="pills page-tabs" role="tablist" aria-label="Pages"></div>
+          <div class="pagebar-actions">
+            <button id="page-add" class="small ghost"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add page</button>
+            <button id="page-menu" class="small ghost icon-btn" title="Page options" aria-label="Page options"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01"/></svg></button>
+          </div>
+        </div>
+        <p class="edit-hint">Editing works best on a larger screen</p>
+        <div class="workspace">
+          <aside class="library card" aria-label="Saved keys">
+            <div class="card-head">
+              <div class="card-titles"><h2 class="card-title">Saved keys</h2><p class="card-sub">Reuse on any page</p></div>
+              <button id="lib-new" class="small" title="New saved key"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New</button>
+            </div>
+            <input id="lib-filter" type="search" placeholder="Filter saved keys" aria-label="Filter saved keys">
+            <ul id="library" class="lib-list scroll"></ul>
+          </aside>
+          <div class="stage">
+            <div class="bezel">
+              <div id="deck" class="deck" role="group" aria-label="Deck keys"></div>
+              <div id="touch" class="touch" hidden></div>
+              <div id="dials" class="dials" hidden></div>
+            </div>
+            <p class="stage-hint"><span>Click a key to edit it</span><span>Drag to move</span><span><kbd>Del</kbd> clears the selected key</span></p>
+          </div>
+          <aside id="inspector" class="inspector scroll" aria-label="Key settings"></aside>
+        </div>
+      </section>
+      <section id="view-twitch" class="view" hidden aria-label="Twitch"></section>
+      <section id="view-bot" class="view" hidden aria-label="Twitch Bot"></section>
+      <section id="view-announce" class="view" hidden aria-label="Announcements"></section>
+      <section id="view-discord" class="view" hidden aria-label="Discord"></section>
+      <section id="view-obs" class="view" hidden aria-label="OBS"></section>
+      <section id="view-plugin" class="view" hidden aria-label="Plugin"></section>
+      <section id="view-settings" class="view" hidden aria-label="Settings"></section>
+    </main>
+  </div>
+</div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head"><h2 id="modal-title"></h2><button id="modal-close" class="ghost icon-btn" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>

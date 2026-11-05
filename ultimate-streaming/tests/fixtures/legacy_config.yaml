@@ -1,0 +1,341 @@
+# Stream Deck XL config — saved changes are picked up live (no restart needed).
+# Every action/state/display below is provided by a file in modules/ (see README.md).
+#
+# Layout: each page is a list of up to 32 buttons, filled left→right, top→bottom
+# (4 rows × 8). Use `-` (empty item) for a blank key.
+#
+# Button fields:
+#   label:  text (use \n to force a line break)        size: starting font size (e.g. 30 for a clock)
+#   icon:   app icon name (steam, firefox, ...), a path, a file in ./icons/, or "emoji:🎮"
+#   bg/fg:  background / text colour
+#   action: one action, or a list of actions run in order
+#   state:  makes the key a live toggle; when true, fields in `active:` override the look
+#   active: e.g. {bg: "#c00", label: "LIVE"}
+#
+# Actions:
+#   run: "shell command"            launch something (detached)
+#   keys: "ctrl+shift+m"            press a combo in the focused window (or a list of combos)
+#   hold: "ctrl+shift+alt+t"        hold a combo down for as long as the key is held (push-to-talk)
+#   type: "some text"               type text
+#   delay: 0.5                      wait (useful inside action lists)
+#   page: name | back               switch page
+#   media: play_pause|next|previous|stop
+#   volume: up|down|mute|50%        default output;   mic: mute  (toggles default input)
+#   brightness: cycle|up|down|sleep|0-100   (sleep toggles the deck dark and back)
+#   obs: ToggleRecord               any obs-websocket request; or {request: X, data: {...}}
+#   obs_scene: "Scene name"          obs_mute: "Mic/Aux"   obs_studio: toggle   obs_screenshot: ~/Pictures
+#   {scene_slot: 3}                 placeholder that becomes a button for OBS's 3rd scene
+#   ha: {service: light.toggle, entity_id: light.office, data: {...}}
+#   http: {url: ..., method: POST, json: {...}, headers: {...}}
+#   notify: "message"
+#   brb_video: next
+#   steam: library | bigpicture | friends | downloads | screenshots | store | {run: <appid>}
+#   {steam_game_slot: 1}            placeholder that becomes a launch key for your most recently played game
+#   brb_poll: 0 | {question, options}   brb_guess: start   brb_game: end|clear|next   brb_hype: reset|fill
+#   radio: next | next_station | prev_station | toggle | on | off | {station: Name}
+#   {station_slot: 3}               placeholder that becomes a key for the 3rd radio station folder
+#   countdown: 300 | "5:00" | stop  on-screen countdown (overlay module → OBS "Countdown" text)
+#   countdown_toggle: {seconds: 300, scene: Starting Soon}   start (and switch scene), or stop if running
+#   twitch: login | clip | marker | stream_info     twitch_ad: 60     twitch_chat: emote|followers|slow|subs|unique
+#   twitch_open: chat | dashboard | channel
+#
+# Other button fields:
+#   confirm: true (or "text")       needs a second press within 3s (for go-live, ads, ...)
+#   display: {source: obs_uptime | obs_health | twitch_viewers | countdown, every: 2}   live text on the key
+#
+# States:
+#   {audio: muted | mic_muted}   {media: playing}
+#   {cmd: "shell test", every: 2}   exit code 0 = on
+#   {obs: record | stream | replay | virtualcam | studio}   {obs_scene: "Name"}   {obs_muted: "Mic/Aux"}
+#   {ha: light.office, equals: "on"}
+#   {twitch_chat: emote|followers|slow|subs|unique}   {twitch: linked}
+
+brightness: 60
+start_page: main
+
+home_assistant:
+  url: https://ha.example.org
+  token_file: ~/.config/streamdeck/ha_token   # long-lived access token (or env HA_TOKEN)
+
+obs: {}   # host/port/password are read from OBS's own websocket config automatically
+
+twitch:
+  # From https://dev.twitch.tv/console → Register Your Application
+  # (OAuth Redirect URL: http://localhost, Category: Broadcaster Suite, Client Type: Public).
+  # Then press "Link Twitch" on the twitch page; the token is kept in ~/.config/streamdeck/twitch.json.
+  channel: "examplechannel"     # your Twitch username: enough for the Chat / Stream manager / Viewers-page links
+  client_id: "abc123exampleclientid"  # privacy-check: allow (made-up example value)
+  slow_mode_seconds: 30
+
+brb:
+  scene: BRB
+  chat_lines: 7
+  media_dir: ~/Stream/brb         # videos/ loop on the BRB screen
+  highlights_count: 0             # set >0 to also add that many of your newest saved replays
+  polls:   # started from the BRB page; viewers vote with !1, !2, ...
+    - {question: "What should I work on next?", options: [Option A, Option B, Option C]}
+    - {question: "Pick a colour", options: [Red, Green, Blue, Yellow]}
+
+radio:
+  dir: ~/Stream/radio             # every folder in here is a station (plays through the "BRB Music" source if a scene has it)
+  default_station: Lofi
+
+pages:
+  main:
+    # Home page: navigation and PC controls only. Streaming controls live on the Twitch page.
+    # ── row 1: pages ────────────────────────────────────────────
+    -
+    -
+    -
+    - {label: Twitch, icon: "emoji:📺", bg: "#1f1f24", action: {page: twitch}}
+    - {label: Steam, icon: steam, bg: "#1f1f24", action: {page: steam}}
+    -
+    -
+    -
+    # ── row 2: clock ────────────────────────────────────────────
+    -
+    -
+    -
+    - {label: Time, size: 30, bg: "#1f1f24", display: {source: clock, show: time, every: 5}}
+    - {label: Date, size: 22, bg: "#1f1f24", fg: "#bf94ff", display: {source: clock, show: date, every: 60}}
+    -
+    -
+    -
+    # ── row 3: PC media & volume ────────────────────────────────
+    -
+    - {label: Prev, icon: "emoji:⏮️", bg: "#1f1f24", action: {media: previous}}
+    - {label: Play, icon: "emoji:▶️", bg: "#1f1f24", action: {media: play_pause},
+       state: {media: playing}, active: {label: Pause, icon: "emoji:⏸️", bg: "#106040"}}
+    - {label: Next, icon: "emoji:⏭️", bg: "#1f1f24", action: {media: next}}
+    - {label: Vol -, icon: "emoji:🔉", bg: "#1f1f24", action: {volume: down}}
+    - {label: Vol +, icon: "emoji:🔊", bg: "#1f1f24", action: {volume: up}}
+    - {label: Mute, icon: "emoji:🔈", bg: "#1f1f24", action: {volume: mute},
+       state: {audio: muted}, active: {label: Muted, icon: "emoji:🔇", bg: "#a01818"}}
+    -
+    # ── row 4: desktops in the corners, mic and desktop tools between ──
+    - {label: Desktop, icon: "emoji:⬅️", bg: "#1f1f24", action: {keys: "ctrl+alt+Left"}}
+    -
+    - {label: Mic, icon: "emoji:🎙️", bg: "#1f1f24", action: {mic: mute},
+       state: {audio: mic_muted, every: 1}, active: {label: Mic muted, bg: "#a01818"}}
+    - {label: Snip, icon: "emoji:✂️", bg: "#1f1f24", action: {run: "mate-screenshot -a"}}
+    - {label: Lock, icon: "emoji:🔒", bg: "#1f1f24", action: {run: "mate-screensaver-command -l"}}
+    - {label: Sleep, icon: "emoji:🌙", bg: "#1f1f24", action: {brightness: sleep}}
+    -
+    - {label: Desktop, icon: "emoji:➡️", bg: "#1f1f24", action: {keys: "ctrl+alt+Right"}}
+
+  home:
+    # Replace the entity ids with your own (Developer Tools → States in Home Assistant).
+    - {label: Office, icon: "emoji:💡", bg: "#333333", action: {ha: {service: light.toggle, entity_id: light.office}},
+       state: {ha: light.office}, active: {bg: "#b08000"}}
+    - {label: Lamp,   icon: "emoji:🛋️", bg: "#333333", action: {ha: {service: light.toggle, entity_id: light.living_room}},
+       state: {ha: light.living_room}, active: {bg: "#b08000"}}
+    - {label: Fan,    icon: "emoji:🌀", bg: "#333333", action: {ha: {service: fan.toggle, entity_id: fan.office}},
+       state: {ha: fan.office}, active: {bg: "#1070a0"}}
+    - {label: Movie,  icon: "emoji:🍿", bg: "#333333", action: {ha: {service: scene.turn_on, entity_id: scene.movie}}}
+    - {label: All off, icon: "emoji:🌙", bg: "#333333", action: {ha: {service: light.turn_off, entity_id: all}}}
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    - {label: Back, icon: "emoji:↩️", bg: "#444444", action: {page: back}}
+
+  twitch:
+    # ── row 1: broadcast ────────────────────────────────────────
+    - {label: Go live, icon: "emoji:🔴", bg: "#333333", action: {obs: ToggleStream}, confirm: true,
+       state: {obs: stream, every: 1}, active: {bg: "#c01010", label: LIVE},
+       display: {source: obs_uptime, every: 1}}
+    - {label: Stream health, icon: "emoji:📶", bg: "#333333", display: {source: obs_health, every: 2}}
+    - {label: Viewers, icon: "emoji:👀", bg: "#333333", action: {twitch_open: channel},
+       display: {source: twitch_viewers, every: 30}}
+    - {label: Record, icon: "emoji:⏺️", bg: "#333333", action: {obs: ToggleRecord},
+       state: {obs: record, every: 1}, active: {label: REC, bg: "#c01010"}}
+    - {label: Pause rec, icon: "emoji:⏸️", bg: "#333333", action: {obs: ToggleRecordPause}}
+    - {label: Save replay, icon: "emoji:💾", bg: "#333333", action: {obs: SaveReplayBuffer}}
+    - {label: Marker, icon: "emoji:📍", bg: "#6441a5", action: {twitch: marker}}
+    - {label: Clip, icon: "emoji:🎬", bg: "#6441a5", action: {twitch: clip}}
+    # ── row 2: audio, chat moderation, ads ──────────────────────
+    - {label: Mic, icon: "emoji:🎙️", bg: "#103040", action: {obs_mute: Mic/Aux},
+       state: {obs_muted: Mic/Aux, every: 1}, active: {label: Mic muted, bg: "#a01818"}}
+    - {label: Desktop, icon: "emoji:🔊", bg: "#103040", action: {obs_mute: Desktop Audio},
+       state: {obs_muted: Desktop Audio, every: 1}, active: {label: Desktop muted, icon: "emoji:🔇", bg: "#a01818"}}
+    - {label: Emote only, icon: "emoji:😀", bg: "#3a2d5c", action: {twitch_chat: emote},
+       state: {twitch_chat: emote, every: 5}, active: {bg: "#9147ff"}}
+    - {label: Follower only, icon: "emoji:💜", bg: "#3a2d5c", action: {twitch_chat: followers},
+       state: {twitch_chat: followers, every: 5}, active: {bg: "#9147ff"}}
+    - {label: Slow mode, icon: "emoji:🐢", bg: "#3a2d5c", action: {twitch_chat: slow},
+       state: {twitch_chat: slow, every: 5}, active: {bg: "#9147ff"}}
+    - {label: Sub only, icon: "emoji:⭐", bg: "#3a2d5c", action: {twitch_chat: subs},
+       state: {twitch_chat: subs, every: 5}, active: {bg: "#9147ff"}}
+    - {label: Ad 60s, icon: "emoji:💰", bg: "#5c4a1a", action: {twitch_ad: 60}, confirm: true}
+    - {label: Radio, icon: "emoji:📻", bg: "#3a2d5c", action: {page: radio}, display: {source: radio, every: 2}}
+    # ── row 3: scenes (from OBS, in Scenes-dock order) + two shortcuts ──
+    - {scene_slot: 1}
+    - {scene_slot: 2}
+    - {scene_slot: 3}
+    - {scene_slot: 4}
+    - {scene_slot: 5}
+    - {scene_slot: 6}
+    - {label: Start in 5:00, icon: "emoji:⏳", bg: "#9147ff",
+       action: {countdown_toggle: {seconds: 300, scene: Starting Soon}}, display: {source: countdown, every: 1}}
+    - {label: Go BRB, icon: "emoji:☕", bg: "#7d2d2d",
+       action: [{obs: {request: SetInputMute, data: {inputName: Mic/Aux, inputMuted: true}}},
+                {obs: {request: SetInputMute, data: {inputName: Desktop Audio, inputMuted: true}}}, {obs_scene: BRB},
+                {countdown: {name: brb_timer, seconds: 900}}, {page: brb}]}
+    # ── row 4: windows & setup ──────────────────────────────────
+    - {label: Chat, icon: "emoji:💬", bg: "#6441a5", action: {twitch_open: chat}}
+    - {label: Stream manager, icon: "emoji:🛠️", bg: "#6441a5", action: {twitch_open: dashboard}}
+    - {label: Open OBS, icon: com.obsproject.Studio, bg: "#302e31", action: {run: obs}}
+    - {label: Stream info, icon: "emoji:✏️", bg: "#9147ff", action: {twitch: stream_info}}
+    - {label: BRB controls, icon: "emoji:🎮", bg: "#7d2d2d", action: {page: brb}}
+    - {label: Link Twitch, icon: "emoji:🔗", bg: "#6441a5", action: {twitch: login},
+       state: {twitch: linked, every: 5}, active: {label: Twitch linked, bg: "#2d7d46"}}
+    - {label: Replay buffer, icon: "emoji:🔁", bg: "#333333", action: {obs: ToggleReplayBuffer},
+       state: {obs: replay, every: 2}, active: {label: Replay on, bg: "#106040"}}
+    - {label: Back, icon: "emoji:↩️", bg: "#444444", action: {page: back}}
+
+  brb:
+    # ── row 1: going away / coming back ─────────────────────────
+    - {label: Go BRB, icon: "emoji:☕", bg: "#7d2d2d",
+       action: [{obs: {request: SetInputMute, data: {inputName: Mic/Aux, inputMuted: true}}},
+                {obs: {request: SetInputMute, data: {inputName: Desktop Audio, inputMuted: true}}}, {obs_scene: BRB},
+                {countdown: {name: brb_timer, seconds: 900}}],
+       state: {obs_scene: BRB}, active: {label: On BRB, bg: "#c01010"}}
+    - {label: Back in 15:00, icon: "emoji:⏳", bg: "#9147ff", action: {countdown_toggle: {name: brb_timer, seconds: 900}},
+       display: {source: countdown, timer: brb_timer, every: 1}}
+    - {label: Back in 5:00, icon: "emoji:⏳", bg: "#9147ff", action: {countdown: {name: brb_timer, seconds: 300}}}
+    - {label: Back in 10:00, icon: "emoji:⏳", bg: "#9147ff", action: {countdown: {name: brb_timer, seconds: 600}}}
+    -
+    -
+    -
+    - {label: "I'm back", icon: "emoji:👋", bg: "#2d7d46",
+       action: [{brb_game: end}, {countdown: {name: brb_timer, stop: true}},
+                {obs: {request: SetInputMute, data: {inputName: Mic/Aux, inputMuted: false}}},
+                {obs: {request: SetInputMute, data: {inputName: Desktop Audio, inputMuted: false}}},
+                {obs_scene: Screen}, {page: back}]}
+    # ── row 2: chat games ───────────────────────────────────────
+    - {label: Poll 1, icon: "emoji:🗳️", bg: "#3a2d5c", action: {brb_poll: 0}}
+    - {label: Poll 2, icon: "emoji:🗳️", bg: "#3a2d5c", action: {brb_poll: 1}}
+    - {label: Guess game, icon: "emoji:⏱️", bg: "#3a2d5c", action: {brb_guess: start}}
+    - {label: No game, icon: "emoji:🎲", bg: "#4e5058", action: {brb_game: next}, display: {source: brb_game, every: 1}}
+    -
+    -
+    -
+    -
+    # ── row 3: hype, BRB video, mic ─────────────────────────────
+    - {label: Hype, icon: "emoji:🔥", bg: "#3a2d5c", action: {brb_hype: reset}, display: {source: brb_hype, every: 1}}
+    - {label: Test hype, icon: "emoji:🧪", bg: "#4e5058", action: {brb_hype: fill}}
+    -
+    -
+    -
+    - {label: Next video, icon: "emoji:🎞️", bg: "#103040",
+       action: {brb_video: next}}
+    - {label: Mic, icon: "emoji:🎙️", bg: "#103040", action: {obs_mute: Mic/Aux},
+       state: {obs_muted: Mic/Aux, every: 1}, active: {label: Mic muted, bg: "#a01818"}}
+    -
+    # ── row 4 ───────────────────────────────────────────────────
+    - {label: Chat offline, icon: "emoji:💬", bg: "#4e5058", state: {chat: connected, every: 5},
+       active: {label: Chat connected, bg: "#2d7d46"}}
+    -
+    -
+    -
+    -
+    -
+    -
+    - {label: Back, icon: "emoji:↩️", bg: "#444444", action: {page: back}}
+
+  radio:
+    # ── rows 1–2: one key per folder in ~/Stream/radio (filled in automatically) ──
+    - {station_slot: 1}
+    - {station_slot: 2}
+    - {station_slot: 3}
+    - {station_slot: 4}
+    - {station_slot: 5}
+    - {station_slot: 6}
+    - {station_slot: 7}
+    - {station_slot: 8}
+    - {station_slot: 9}
+    - {station_slot: 10}
+    - {station_slot: 11}
+    - {station_slot: 12}
+    - {station_slot: 13}
+    - {station_slot: 14}
+    - {station_slot: 15}
+    - {station_slot: 16}
+    # ── row 3: controls ─────────────────────────────────────────
+    - {label: Prev station, icon: "emoji:⏮️", bg: "#103040", action: {radio: prev_station}}
+    - {label: Next station, icon: "emoji:⏭️", bg: "#103040", action: {radio: next_station}}
+    - {label: Skip track, icon: "emoji:🎵", bg: "#103040", action: {radio: next}, display: {source: radio, track: true, every: 2}}
+    - {label: Radio, icon: "emoji:📻", bg: "#a01818", action: {radio: toggle},
+       state: {radio: "on", every: 1}, active: {label: Radio on, bg: "#2d7d46"}}
+    -
+    -
+    -
+    -
+    # ── row 4 ───────────────────────────────────────────────────
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    - {label: Back, icon: "emoji:↩️", bg: "#444444", action: {page: back}}
+
+  steam:
+    # ── row 1: Steam client & in-game ───────────────────────────
+    - {label: Library, icon: steam, bg: "#1b2838", action: {steam: library}}
+    - {label: Big Picture, icon: "emoji:🖥️", bg: "#1b2838", action: {steam: bigpicture}}
+    - {label: Friends, icon: "emoji:👥", bg: "#1b2838", action: {steam: friends}}
+    - {label: Downloads, icon: "emoji:⬇️", bg: "#1b2838", action: {steam: downloads}}
+    - {label: Screenshots, icon: "emoji:🖼️", bg: "#1b2838", action: {steam: screenshots}}
+    - {label: Store, icon: "emoji:🛒", bg: "#1b2838", action: {steam: store}}
+    - {label: Overlay, icon: "emoji:🎮", bg: "#3a2a10", action: {keys: "shift+tab"}}
+    - {label: Screenshot, icon: "emoji:📸", bg: "#3a2a10", action: {keys: F12}}
+    # ── rows 2–3: your installed games, most recently played first ──
+    - {steam_game_slot: 1}
+    - {steam_game_slot: 2}
+    - {steam_game_slot: 3}
+    - {steam_game_slot: 4}
+    - {steam_game_slot: 5}
+    - {steam_game_slot: 6}
+    - {steam_game_slot: 7}
+    - {steam_game_slot: 8}
+    - {steam_game_slot: 9}
+    - {steam_game_slot: 10}
+    - {steam_game_slot: 11}
+    - {steam_game_slot: 12}
+    - {steam_game_slot: 13}
+    - {steam_game_slot: 14}
+    - {steam_game_slot: 15}
+    - {steam_game_slot: 16}
+    # ── row 4 ───────────────────────────────────────────────────
+    -
+    -
+    -
+    -
+    -
+    -
+    -
+    - {label: Back, icon: "emoji:↩️", bg: "#444444", action: {page: back}}

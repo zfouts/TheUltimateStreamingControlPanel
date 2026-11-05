@@ -1,0 +1,6 @@
+name: bambu
+version: "1.0.0"
+description: Bambu Lab 3D printer status, camera in OBS, Discord snapshots and printer controls
+api: 1
+commands:
+  ffmpeg: printer camera in OBS (version 5.1 or newer)

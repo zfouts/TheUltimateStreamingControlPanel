@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=The Ultimate Streaming Control Panel for Linux
+Comment=Set up your Stream Deck keys, OBS and Twitch
+Exec=@PYTHON@ "@ROOT@/main.py" --open-editor
+Icon=input-keyboard
+Terminal=false
+Categories=Utility;Settings;

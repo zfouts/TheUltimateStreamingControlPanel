@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Fetched at install time (tools/fetch_deps.py), never committed
+ultimate-streaming/vendor/
+ultimate-streaming/vendor.new/
+
+# Personal config, tokens and generated files (normally in ~/.config/ultimate-streaming, but never commit them)
+config.yaml
+!config.example.yaml
+*.json.bak
+twitch.json
+ha_token
+obs_password
+env
+ultimate-streaming/preview/

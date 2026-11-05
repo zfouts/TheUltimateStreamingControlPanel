@@ -1,0 +1,39 @@
+/* Discord page (js/discord.js). Tokens and components from style.css only. */
+.dc-page { max-width: 880px; }
+.dc-form, .dc-list { display: flex; flex-direction: column; gap: var(--s-4); }
+.dc-hook { display: flex; flex-direction: column; gap: var(--s-4); }
+.dc-hook-head { display: flex; align-items: center; gap: var(--s-3); }
+.dc-hook-head .card-titles { flex-direction: row; flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s-2); }
+.dc-hook input[type=text] { width: 100%; }
+.dc-url-row { flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+.dc-url-row input { flex: 1 1 260px; min-width: 0; }
+.dc-howto { margin: 0; overflow-wrap: anywhere; }
+
+
+.dc-used { margin-bottom: 0; }
+.dc-chips { display: flex; flex-wrap: wrap; gap: var(--s-1); list-style: none; margin: 0; padding: 0; }
+.dc-chip { border: 1px solid var(--line-2); border-radius: 999px; padding: 2px var(--s-3); font-size: var(--fs-sm, 13px); overflow-wrap: anywhere; }
+.dc-chip.plain { color: var(--muted); }
+button.small.ghost.dc-chip { color: var(--accent); background: var(--accent-soft, transparent); text-align: left; height: auto; min-height: 0; border-color: transparent; }
+
+.dc-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line-2); }
+.dc-result { display: inline-flex; align-items: center; gap: var(--s-2); min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
+.dc-result .ic { width: 16px; height: 16px; flex: none; }
+.dc-result.ok { color: var(--ok); }
+.dc-result.bad { color: var(--bad); }
+.dc-add { align-items: center; gap: var(--s-3); }
+
+.dc-savebar {
+  position: sticky; bottom: var(--s-3); z-index: 5; display: flex; flex-direction: column; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4); border: 1px solid var(--line-2); border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px); box-shadow: var(--shadow-2);
+}
+.dc-save-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); }
+.dc-save-row .hint { margin-left: auto; }
+.dc-errs { margin: var(--s-1) 0 0; padding-left: var(--s-5); }
+.dc-savebar .banner { padding: var(--s-2) var(--s-3); gap: var(--s-2); }
+
+@media (max-width: 560px) {
+  .dc-hook-head { flex-wrap: wrap; }
+  .dc-save-row .hint { margin-left: 0; width: 100%; }
+}

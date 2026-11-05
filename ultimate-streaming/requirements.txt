@@ -1,0 +1,9 @@
+# Pure-Python dependencies, installed into ./vendor by install.sh (tools/fetch_deps.py),
+# or equivalently:  python3 -m pip install --target vendor --require-hashes -r requirements.txt
+# Pinned with hashes so every install gets exactly these files.
+streamdeck==0.10.0 --hash=sha256:c1b9acee34c186eeb3a954cf873bbaac4b1ffda26dac12d9f7c475d89f70ef0c
+obsws-python==1.8.0 --hash=sha256:537bde416e149b6f59e0b2f31761d4a40329feafec171bde6fc1346ab8516e28
+websocket-client==1.9.2 --hash=sha256:e1a673830a9c7bfa47b1cd3d5e4178f4c9651d80a4eab02c9c23a1c3ec6250ce
+# Chat stats database (pure-Python wheel)
+SQLAlchemy==2.1.5 --hash=sha256:2f77b77b716f005b2dc3cc059d56df6a919bfb5b439e4149890a9df6c36be9e3
+typing-extensions==4.16.0 --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8

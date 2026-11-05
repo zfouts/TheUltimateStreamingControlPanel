@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Pre-commit privacy check: stops a commit that would publish credentials or personal data.
+
+Enable it once per clone:     git config core.hooksPath .githooks
+Check everything tracked:     .githooks/pre-commit --all
+
+What it looks for in the staged files:
+  * files that hold credentials or personal config (config.yaml, tokens, vendor/, ...)
+  * things shaped like secrets (OAuth/API tokens, private keys, JWTs, "password: ...")
+  * email addresses (except noreply/example ones) and absolute home-directory paths
+  * your own private words: one per line in .git/info/private-patterns (case-insensitive;
+    lines starting with "re:" are regular expressions). That file lives inside .git/,
+    so it is never committed. Put your channel name, client id, hostnames, serials there.
+
+A line that really must contain a match can end with the comment  privacy-check: allow
+"""
+import os
+import re
+import subprocess
+import sys
+
+BLOCKED_FILES = [
+    r"(^|/)config\.yaml$", r"(^|/)twitch\.json$", r"(^|/)ha_token$", r"(^|/)obs_password$",
+    r"(^|/)editor_token$", r"(^|/)env$", r"(^|/)\.env(\..*)?$", r"(^|/)vendor(\.new)?/",
+    r"\.(pem|key|p12|pfx)$", r"(^|/)id_(rsa|ed25519|ecdsa)$", r"(^|/)backups/config-",
+]
+SECRET_SHAPES = [
+    ("private key", r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    ("Twitch OAuth token", r"\boauth:[a-z0-9]{20,}"),
+    ("bearer token", r"(?i)\bbearer\s+[a-z0-9._~+/-]{20,}=*"),
+    ("JWT", r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),
+    ("GitHub token", r"\b(ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}"),
+    ("Slack token", r"\bxox[abprs]-[A-Za-z0-9-]{10,}"),
+    ("AWS key", r"\bAKIA[0-9A-Z]{16}\b"),
+    ("Google API key", r"\bAIza[0-9A-Za-z_-]{35}\b"),
+    ("credential value",
+     r"""(?i)\b(token|password|passwd|secret|client_id|client_secret|api_key|access_key)["']?\s*[:=]\s*["']?[A-Za-z0-9_\-+/]{16,}"""),
+]
+EMAIL = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
+EMAIL_OK = r"(?i)(noreply|no-reply|example\.(com|org|net)|@localhost|users\.noreply\.github\.com)"
+HOME_PATH = r"(/home/|/Users/)(?!you\b|user\b|USER\b|me\b|runner\b|\$|<)[A-Za-z0-9._-]+"
+ALLOW = "privacy-check: allow"
+
+
+def git(*args):
+    return subprocess.run(["git", *args], capture_output=True, check=True).stdout
+
+
+def private_patterns():
+    path = os.path.join(git("rev-parse", "--git-dir").decode().strip(), "info", "private-patterns")
+    out = []
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                out.append(re.compile(line[3:] if line.startswith("re:") else re.escape(line), re.I))
+    except FileNotFoundError:
+        pass
+    return out, path
+
+
+def main():
+    all_files = "--all" in sys.argv[1:]
+    if all_files:
+        names = git("ls-files", "-z").decode().split("\0")
+        read = lambda n: open(n, "rb").read() if os.path.isfile(n) else b""  # noqa: E731
+    else:
+        names = git("diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z").decode().split("\0")
+        read = lambda n: git("show", f":{n}")  # noqa: E731  (the staged version, not the working copy)
+    names = [n for n in names if n]
+    mine, mine_path = private_patterns()
+    problems = []
+    for name in names:
+        for pat in BLOCKED_FILES:
+            if re.search(pat, name) and not name.endswith(".example.yaml"):
+                problems.append(f"{name}: this file shouldn't be committed (credentials, personal config or vendored code)")
+                break
+        data = read(name)
+        if b"\0" in data[:8000]:
+            continue  # binary
+        for lineno, line in enumerate(data.decode("utf-8", "replace").splitlines(), 1):
+            if ALLOW in line:
+                continue
+            where = f"{name}:{lineno}"
+            for label, pat in SECRET_SHAPES:
+                if re.search(pat, line):
+                    problems.append(f"{where}: looks like a {label}")
+            for m in re.finditer(EMAIL, line):
+                if not re.search(EMAIL_OK, m.group()):
+                    problems.append(f"{where}: email address {m.group()}")
+            if re.search(HOME_PATH, line):
+                problems.append(f"{where}: absolute home path (use ~ or $HOME)")
+            for pat in mine:
+                if pat.search(line):
+                    problems.append(f"{where}: matches a private pattern ({pat.pattern})")
+    if not mine:
+        print(f"privacy check: note: no private patterns set up in {mine_path}", file=sys.stderr)
+    if problems:
+        print("privacy check failed. Nothing was committed:\n", file=sys.stderr)
+        for p in problems:
+            print("  " + p, file=sys.stderr)
+        print(f"\nFix these (or end a line with '# {ALLOW}' if it's genuinely fine).", file=sys.stderr)
+        return 1
+    print(f"privacy check: {len(names)} file(s) clean", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

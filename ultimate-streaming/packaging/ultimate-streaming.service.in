@@ -1,0 +1,17 @@
+# Installed by install.sh into ~/.config/systemd/user/ultimate-streaming.service
+[Unit]
+Description=The Ultimate Streaming Control Panel for Linux (Stream Deck + OBS + Twitch daemon)
+Documentation=file://@ROOT@/README.md
+After=graphical-session.target
+
+[Service]
+ExecStart=@PYTHON@ @ROOT@/main.py
+Restart=always
+RestartSec=3
+# Key-press actions, notifications and links need the desktop session's environment.
+# If they don't work, run once per login:  systemctl --user import-environment DISPLAY XAUTHORITY WAYLAND_DISPLAY
+# Credentials can go in an env file instead of files (chmod 600), e.g. TWITCH_CLIENT_ID=..., HA_TOKEN=...
+EnvironmentFile=-%h/.config/ultimate-streaming/env
+
+[Install]
+WantedBy=default.target

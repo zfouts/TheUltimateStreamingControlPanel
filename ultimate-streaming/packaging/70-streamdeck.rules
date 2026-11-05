@@ -1,0 +1,10 @@
+# Lets the logged-in desktop user use Stream Decks and the virtual keyboard without root.
+# Install:  sudo cp 70-streamdeck.rules /etc/udev/rules.d/ && sudo udevadm control --reload && sudo udevadm trigger
+# (must sort before 73-seat-late.rules, which applies the "uaccess" tag)
+
+# Elgato Stream Deck, all models (USB vendor 0fd9)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0fd9", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0fd9", TAG+="uaccess"
+
+# /dev/uinput, for `keys:` / `type:` / `hold:` actions (optional: they fall back to X11 XTest)
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"
