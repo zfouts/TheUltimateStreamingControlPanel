@@ -1,0 +1,79 @@
+/* Moderation page (js/automod.js). Tokens and components from style.css only. */
+.am-page { max-width: 880px; display: flex; flex-direction: column; gap: var(--s-4); }
+.am-page > .page-head { margin-bottom: 0; }
+.am-form { display: flex; flex-direction: column; gap: var(--s-4); }
+.am-page .card { min-width: 0; }
+.am-page .card > * + * { margin-top: var(--s-4); }
+
+.am-settings { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--s-4) var(--s-6); }
+.am-exempt { width: 280px; max-width: 100%; }
+.am-exempt select { width: 100%; }
+.am-caught { margin-left: auto; display: flex; align-items: baseline; gap: var(--s-2); }
+.am-caught-n { font-size: var(--fs-xl, 24px); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.am-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.am-row {
+  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) auto; align-items: center; gap: var(--s-2) var(--s-3);
+  padding: var(--s-3); border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--panel-2, var(--panel));
+}
+.am-term input { width: 100%; }
+.am-term input.invalid { border-color: var(--bad); }
+.am-opts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); min-width: 0; }
+.am-opts select { flex: 0 1 170px; width: 170px; min-width: 0; }
+.am-page .banner { flex-direction: row; align-items: center; }
+.am-page .banner .grow { min-width: 0; }
+.am-dur { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.am-dur[hidden] { display: none; }
+.am-dur input { width: 130px; }
+.am-dur input[hidden] { display: none; }
+.am-row-end { display: flex; align-items: center; gap: var(--s-2); }
+.am-add { align-items: center; gap: var(--s-3); }
+.am-how { color: var(--muted); font-size: var(--fs-sm); }
+.am-how summary { cursor: pointer; width: fit-content; }
+.am-how p { margin: var(--s-2) 0 0; max-width: 68ch; }
+:root .danger-text { color: var(--bad); }
+
+.am-savebar {
+  position: sticky; bottom: var(--s-3); z-index: 5; display: flex; flex-direction: column; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4); border: 1px solid var(--line-2); border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px); box-shadow: var(--shadow-2);
+}
+.am-save-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); }
+.am-save-row .hint { margin-left: auto; }
+.am-errs { margin: var(--s-1) 0 0; padding-left: var(--s-5); }
+.am-savebar .banner { padding: var(--s-2) var(--s-3); gap: var(--s-2); }
+
+.am-test-row { display: flex; gap: var(--s-2); }
+.am-test-row input { flex: 1; min-width: 0; }
+.am-result:empty { display: none; }
+.am-result { display: flex; flex-direction: column; gap: var(--s-1); }
+.am-verdict { display: flex; align-items: center; gap: var(--s-2); overflow-wrap: anywhere; }
+.am-verdict .ic { width: 18px; height: 18px; flex: none; }
+.am-verdict.ok { color: var(--ok); }
+.am-verdict.bad { color: var(--bad); }
+.am-seen { overflow-wrap: anywhere; }
+.am-seen code { font-family: var(--mono, ui-monospace, monospace); }
+
+.am-log { list-style: none; margin: 0; padding: 0; }
+.am-entry { display: flex; flex-direction: column; gap: var(--s-1); padding: var(--s-3) 0; border-top: 1px solid var(--line-2); min-width: 0; }
+.am-entry:first-child { border-top: 0; padding-top: 0; }
+.am-entry-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-1) var(--s-3); min-width: 0; }
+.am-user { font-weight: 650; overflow-wrap: anywhere; }
+.am-matched { color: var(--muted); overflow-wrap: anywhere; }
+.am-when { margin-left: auto; white-space: nowrap; }
+.am-text { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.am-entry-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); }
+.am-entry-foot button { margin-left: auto; }
+.am-detail { color: var(--bad); font-size: var(--fs-sm); overflow-wrap: anywhere; min-width: 0; }
+
+/* Chat feed row (js/twitch.js) for "Auto-mod hid a message from …". */
+.tw-msg.tw-msg-system .tw-text { color: var(--muted); font-style: italic; }
+
+@media (max-width: 640px) {
+  .am-row { grid-template-columns: minmax(0, 1fr); }
+  .am-opts select { flex: 1 1 140px; width: auto; }
+  .am-row-end { justify-content: space-between; }
+  .am-caught { margin-left: 0; }
+  .am-exempt { width: 100%; }
+  .am-save-row .hint { margin-left: 0; width: 100%; }
+}

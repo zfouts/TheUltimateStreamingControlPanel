@@ -663,6 +663,17 @@ class Twitch(Module):
         self._throttle("ban", 1)
         self.api("POST", "/moderation/bans", params={"broadcaster_id": uid, "moderator_id": uid}, json={"data": data})
 
+    def unban(self, user_id):
+        """Lift a ban or timeout."""
+        if isinstance(user_id, int) and not isinstance(user_id, bool):
+            user_id = str(user_id)
+        if not isinstance(user_id, str) or not USER_ID_RE.fullmatch(user_id):
+            raise ApiError("not a Twitch user id")
+        self.require("moderator:manage:banned_users")
+        uid = self.me()["id"]
+        self._throttle("ban", 1)
+        self.api("DELETE", "/moderation/bans", params={"broadcaster_id": uid, "moderator_id": uid, "user_id": user_id})
+
     def announce(self, text, color="primary"):
         text = _text(text, "announcement", CHAT_MAX)
         color = "primary" if color is None else color

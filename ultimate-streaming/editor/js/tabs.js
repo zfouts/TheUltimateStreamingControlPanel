@@ -12,6 +12,7 @@ export const GROUPS = {
     { view: 'twitch', label: 'Channel' },
     { view: 'bot', label: 'Bot' },
     { view: 'announce', label: 'Announcements' },
+    { view: 'automod', label: 'Moderation' },
   ],
   settings: [
     { view: 'settings', tab: 'general', label: 'General' },

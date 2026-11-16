@@ -82,7 +82,12 @@ export async function api(path, body) {
   let data = {};
   try { data = await r.json(); } catch (e) { /* no body */ }
   if (r.status === 401 && REMOTE && TOKEN) remoteSignedOut();
-  if (!r.ok) throw new ApiError(data.error || r.statusText, r.status, data.mismatch ? { mismatch: data.mismatch } : undefined);
+  if (!r.ok) {
+    const extra = {};
+    if (data.mismatch) extra.mismatch = data.mismatch;
+    if (Array.isArray(data.errors)) extra.errors = data.errors.filter((x) => typeof x === 'string').slice(0, 50);
+    throw new ApiError(data.error || r.statusText, r.status, extra);
+  }
   return data;
 }
 

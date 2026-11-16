@@ -231,6 +231,22 @@ twitch:
 #       embed: true                   # add a card with the title, game, link and stream preview
 #       ping: none                    # none, everyone, here or role:<role id>
 
+# ── Auto-mod ─────────────────────────────────────────────────────────────────
+# Bans, times out or deletes chat messages that contain a keyword. Twitch → Moderation in the
+# control panel edits this, shows what was caught and can undo a ban. A caught message never
+# reaches the BRB chat feed, the panel's chat or the Twitch Bot. Banning needs Twitch linked;
+# the broadcaster and moderators are never actioned. See README → Auto-mod.
+# automod:
+#   enabled: true
+#   exempt: vip                       # subscriber, vip or moderator: that level and up is never actioned
+#   terms:                            # up to 200
+#     - {term: streamboo, action: ban}                # viewer-bot spam ("Best viewers on streamboo .com")
+#     - {term: "buy followers", action: timeout, seconds: 600}
+#     - {term: spoiler, action: delete}
+#     # match: word (the default) ignores case, spacing, punctuation and lookalike letters, but
+#     # needs word boundaries: "streamboo" catches "s t r e a m b o o" and "STREAMB00", not
+#     # "stream boost". match: anywhere also matches inside other words.
+
 # ── Twitch alerts ────────────────────────────────────────────────────────────
 # On-stream alerts for follows, subs, resubs, gifted subs, cheers and raids: text in
 # ~/.config/ultimate-streaming/overlay/alert.txt (the "Alert" source the scene builder adds),

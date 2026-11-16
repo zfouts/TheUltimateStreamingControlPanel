@@ -34,18 +34,19 @@ Screen, Game, Camera, an interactive BRB screen, Ending) for the deck to control
 6. [BRB media](#brb-media)
 7. [The control panel](#the-control-panel): views, backups, import, security, [using it from another device](#using-the-panel-from-another-device)
 8. [Twitch Bot](#twitch-bot): timers, commands, rewards, chat stats
-9. [Discord webhooks](#discord-webhooks): the Discord channels your features post to
-10. [Go-live announcements](#go-live-announcements): post to Discord when you go live
-11. [Twitch alerts](#twitch-alerts): follows, subs, cheers and raids on stream
-12. [Configuring pages in YAML](#configuring-pages-in-yaml)
-13. [Stream Deck models](#stream-deck-models), including several decks
-14. [Optional integrations](#optional-integrations): Home Assistant, Steam, remote OBS
-15. [Plugins](#plugins): installing optional integrations, including [Bambu Lab printers](#bambu-lab-printers)
-16. [Files and settings reference](#files-and-settings-reference)
-17. [Troubleshooting](#troubleshooting)
-18. [Writing a module](#writing-a-module) (Python, only for new kinds of action)
-19. [Writing a plugin](#writing-a-plugin)
-20. [Development](#development): tests, CI, the panel's code, HTTP API, events
+9. [Auto-mod](#auto-mod): ban, time out or delete chat messages by keyword
+10. [Discord webhooks](#discord-webhooks): the Discord channels your features post to
+11. [Go-live announcements](#go-live-announcements): post to Discord when you go live
+12. [Twitch alerts](#twitch-alerts): follows, subs, cheers and raids on stream
+13. [Configuring pages in YAML](#configuring-pages-in-yaml)
+14. [Stream Deck models](#stream-deck-models), including several decks
+15. [Optional integrations](#optional-integrations): Home Assistant, Steam, remote OBS
+16. [Plugins](#plugins): installing optional integrations, including [Bambu Lab printers](#bambu-lab-printers)
+17. [Files and settings reference](#files-and-settings-reference)
+18. [Troubleshooting](#troubleshooting)
+19. [Writing a module](#writing-a-module) (Python, only for new kinds of action)
+20. [Writing a plugin](#writing-a-plugin)
+21. [Development](#development): tests, CI, the panel's code, HTTP API, events
 
 ## Prerequisites
 
@@ -360,8 +361,8 @@ Twitch shows these scopes when you approve:
 | `channel:manage:broadcast` | change title, category and tags; add stream markers |
 | `moderator:manage:chat_settings` | chat modes: emote-only, followers-only, slow, subscribers-only, unique chat |
 | `user:write:chat` | send chat messages from the panel and the Twitch Bot |
-| `moderator:manage:chat_messages` | delete chat messages |
-| `moderator:manage:banned_users` | time out and ban |
+| `moderator:manage:chat_messages` | delete chat messages (also [auto-mod](#auto-mod)) |
+| `moderator:manage:banned_users` | time out and ban (also [auto-mod](#auto-mod)) |
 | `moderator:manage:announcements` | post announcements |
 | `moderator:manage:shoutouts` | send shoutouts |
 | `channel:manage:raids` | start and cancel raids |
@@ -413,7 +414,7 @@ panel.
 |---|---|
 | Live (`1`) | press keys on a mirror of each deck, switch pages, set brightness; go live, record, replay, virtual camera; scenes and mutes; chat feed, BRB games, hype meter, countdowns; activity log |
 | Deck (`2`) | edit keys, pages, layouts, dials and the Neo's touch keys (below) |
-| Twitch (`3`) | tabs **Channel**, **Bot** and **Announcements**. Channel: setup until you're linked; then title, category and tags (or a recent setup), chat with moderation, shoutouts, chat modes, ads, markers, clips, raids. Bot: timers, commands, rewards and chat stats; see [Twitch Bot](#twitch-bot). Announcements: see [Go-live announcements](#go-live-announcements) |
+| Twitch (`3`) | tabs **Channel**, **Bot**, **Announcements** and **Moderation**. Channel: setup until you're linked; then title, category and tags (or a recent setup), chat with moderation, shoutouts, chat modes, ads, markers, clips, raids. Bot: timers, commands, rewards and chat stats; see [Twitch Bot](#twitch-bot). Announcements: see [Go-live announcements](#go-live-announcements). Moderation: see [Auto-mod](#auto-mod) |
 | OBS (`4`) | outputs and screenshots, scenes with studio mode, audio mixer, performance stats, a raw WebSocket request console |
 | Settings (`5`) | tabs **General**, **OBS**, **BRB & radio**, **Home Assistant**, **Access**, **Backups** and **Discord**. **General** has the setup checklist, **Existing setup** (see [Coming from another setup](#coming-from-another-setup)), the Twitch link card, **Decks** (see [Several decks](#several-decks)) and deck options (brightness, deck serial, editor port). **OBS** has OBS scenes and OBS on another computer. **BRB & radio** has the BRB screen, chat polls and the radio folder. **Access** has **Sign out all panels** and [Remote access](#using-the-panel-from-another-device). **Backups** has backups and history, **Import a setup…** and **External backups**. **Discord** holds your [Discord webhooks](#discord-webhooks) |
 
@@ -690,6 +691,42 @@ twitch_bot:
       revert: [{obs_color: {source: Background, color: "#1a1a2e"}}]
       reply: "{user} turned the background {color}!"
 ```
+
+---
+
+## Auto-mod
+
+Bans, times out or deletes chat messages that contain a keyword, such as the viewer-bot spam
+"Best viewers on streamboo .com". In the control panel: **Twitch → Moderation**, add the
+keywords, pick what happens to each, **Save**, and turn auto-mod on with the switch at the top.
+
+- **Actions:** **Ban** (permanent), **Time out** (1 second to 14 days) or **Delete message**
+  (just that message). When several keywords match one message, the strongest action wins.
+- **Matching** ignores case, accents, spaces and punctuation between letters, lookalike letters
+  from other alphabets (a Cyrillic "а" for "a") and digit or symbol swaps ("STREAMB00", "$cam").
+  By default a keyword must start and end on word boundaries: `streamboo` catches
+  "s t r e a m b o o", "streamboo(.)com" and "str.eam-boo", but not "stream boost" or
+  "upstream boo". Set a keyword to **Anywhere** to match inside other words too (at least 3
+  letters or digits); that's riskier for short words. There are no regular expressions.
+- **Test a message** shows what a line would trigger, and what the filter sees, without
+  touching Twitch.
+- **Who is spared:** you and your moderators, always. **Exempt** (default VIPs) also spares
+  VIPs, or subscribers and up, or nobody else.
+- **What viewers see:** the message shows in Twitch chat for a moment, until the ban or delete
+  lands (Twitch then removes it). It never reaches your [BRB](#brb-media) chat feed, the panel's
+  chat, Twitch Bot commands or chat stats, because the check runs before anything else gets the
+  message.
+- **Recent actions** lists the last 100 (who, which keyword, the message, and whether Twitch
+  accepted it). **Unban** (or **Remove timeout**) undoes one; that viewer isn't auto-actioned
+  again until the daemon restarts. A spammer who posts five times is banned once.
+
+Banning and deleting go out through your [linked](#link-twitch) Twitch account, which needs
+`moderator:manage:banned_users` and `moderator:manage:chat_messages`; Twitch allows one ban a
+second, and auto-mod waits its turn rather than dropping one. Without a linked account, caught
+messages are still hidden from your overlay and the panel, and the page says they weren't
+actioned. Twitch's own **Blocked terms** setting is no substitute: it hides a message but never
+bans the sender. The YAML is the `automod:` section; `config.example.yaml` has an annotated
+example.
 
 ---
 
@@ -1473,6 +1510,10 @@ first deck.
 | POST | `/api/announce/config` | validate and save (`{config, hash}`); each destination's `webhook` must be a Discord webhook id |
 | POST | `/api/announce/test` | queue a `[Test]` post to one destination (`{id}`; at most one every 10 s); the result arrives in the status event |
 | POST | `/api/announce/now` | queue an announcement now, ignoring the once-per-stream check |
+| GET | `/api/automod` | auto-mod: config, status (`{enabled, caught, ready, detail}`), recent actions (newest first), limits, hash |
+| POST | `/api/automod/config` | validate and save (`{config, hash}`) |
+| POST | `/api/automod/test` | what a message would trigger (`{text, config}`; `config` optional, the unsaved terms): `{hit, seen}` |
+| POST | `/api/automod/unban` | undo a ban or timeout from the recent actions (`{id}`) |
 
 ### Events
 
@@ -1491,6 +1532,7 @@ first deck.
 | `config` | `{hash}` | `config.yaml` was reloaded |
 | `twitch_auth` | same as `GET /api/twitch/auth` | the Twitch login progressed |
 | `bot` | `{ts, kind, title, user, ok, error}` | the Twitch Bot did something: `kind` is `timer`, `command`, `reward`, `revert` or `error` (at most 5 a second; the rest stay in `GET /api/bot` status) |
+| `automod` | `{entry}` | auto-mod caught a message, or an action finished or was undone (`entry` as in `GET /api/automod`'s `log`) |
 | `alert` | `{kind, user, text, ts}` | an [alert](#twitch-alerts) went on screen (`user` is "Someone" for a blocklisted name) |
 | `eventsub` | `{connected, subscriptions, error}` | the EventSub connection changed; `error` is `null`, `relink`, `subscribe`, `account` or `revoked` |
 | `ping` | `{}` | keep-alive, every 15 s |
@@ -1503,6 +1545,7 @@ core/                daemon: devices, layouts, drawing, polling, module loader, 
 core/webapi/         the panel's HTTP server and its API routes
 core/plugins.py, core/plugin_install.py   plugin manifest and loading; installing and removing
 core/chatcmd.py      chat built-ins that modules and plugins add to the Twitch Bot
+core/automod.py      auto-mod keyword matching (modules/automod.py screens chat and bans)
 modules/             one file per integration (obs, twitch, twitch_bot, brb, overlay, chat, steam, editor, …)
 plugins/             catalog of optional plugins (bambu); loaded only once installed
 editor/              the control panel's page

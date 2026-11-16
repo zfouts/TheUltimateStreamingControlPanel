@@ -8,13 +8,14 @@ import * as deck from './app.js';
 import * as twitch from './twitch.js';
 import * as bot from './twitchbot.js';
 import * as announce from './announce.js';
+import * as automod from './automod.js';
 import * as discord from './discord.js';
 import * as obs from './obs.js';
 import * as plugins from './plugins.js';
 import { maybeWelcome } from './backups.js';
 import { activeTab, groupOf, navView, renderTabs } from './tabs.js';
 
-const VIEWS = { live, deck, twitch, bot, announce, obs, discord, plugin: plugins, settings: deck.settings };
+const VIEWS = { live, deck, twitch, bot, announce, automod, obs, discord, plugin: plugins, settings: deck.settings };
 const mounted = new Set();
 let current = null;
 export let status = {};          // last /api/status (setup-level facts)

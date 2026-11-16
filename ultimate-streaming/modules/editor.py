@@ -64,7 +64,7 @@ from core.remote_access import (DEFAULT_PORT as REMOTE_PORT, Devices, Pairing, P
 from core.render import ICON_DIRS, Renderer, valid_color
 from core.safefs import write_atomic
 from core.schema import UI, Choice
-from core.webapi import (ApiError, Router, announce_api, backup_api, bot_api, discord_api, import_api, live_api,
+from core.webapi import (ApiError, Router, announce_api, automod_api, backup_api, bot_api, discord_api, import_api, live_api,
                          obs_api, plugin_api, setup_api, twitch_api)
 from core.webapi.server import (LOCAL_ONLY_MESSAGE, MAX_SUBSCRIBERS, AddressCache, FailureLimit, Handler,
                                 RemoteServer, StreamSlots, WarnLimit)
@@ -151,7 +151,7 @@ class Editor(Module):
         self.last_status = None
         self.router = Router()
         self._routes()
-        for api in (live_api, obs_api, twitch_api, bot_api, announce_api, discord_api, backup_api, import_api,
+        for api in (live_api, obs_api, twitch_api, bot_api, announce_api, automod_api, discord_api, backup_api, import_api,
                     setup_api, plugin_api):
             api.register(self.router, self)
         self.log_handler = _LogHandler(self.hub)
