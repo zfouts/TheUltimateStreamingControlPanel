@@ -1,6 +1,7 @@
 /* The key editor (Deck view) and the Settings view. Mounted by main.js. */
-import { api, on } from './api.js';
-import { $, h, icon, empty, clone, isObj, debounce, toast, openModal, closeModal, modalOpen, confirmDialog, asyncButton } from './ui.js';
+import { api, on, REMOTE } from './api.js';
+import { innerTab } from './tabs.js';
+import { $, h, icon, empty, clone, isObj, debounce, toast, openModal, closeModal, modalOpen, confirmDialog, asyncButton, switchInput } from './ui.js';
 import { go, refreshStatus as shellRefreshStatus, status as shellStatus } from './main.js';
 import { historyCard } from './backups.js';
 import { existingSetupCard, externalBackupsCard } from './onboarding.js';
@@ -1002,8 +1003,53 @@ export function canonicalJson(v) {
     so the server only enables the exact action the user was shown. */
 async function expectOf(action) {
   const bytes = new TextEncoder().encode(canonicalJson(action));
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  if (window.isSecureContext && crypto.subtle) {
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  return sha256Hex(bytes);   // crypto.subtle only exists on https/localhost pages; the panel may be plain HTTP
+}
+
+/** Pure-JS SHA-256 (hex) of a Uint8Array, for pages without crypto.subtle. */
+function sha256Hex(bytes) {
+  const K = new Uint32Array(64);
+  for (let i = 0, n = 2; i < 64; n++) {
+    let prime = true;
+    for (let d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; }
+    if (prime) { K[i++] = Math.floor((Math.cbrt(n) % 1) * 4294967296); }
+  }
+  const H = new Uint32Array(8);
+  for (let i = 0, n = 2; i < 8; n++) {
+    let prime = true;
+    for (let d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; }
+    if (prime) { H[i++] = Math.floor((Math.sqrt(n) % 1) * 4294967296); }
+  }
+  const len = bytes.length;
+  const total = (len + 9 + 63) & ~63;
+  const m = new Uint8Array(total);
+  m.set(bytes);
+  m[len] = 0x80;
+  const dv = new DataView(m.buffer);
+  dv.setUint32(total - 8, Math.floor(len / 0x20000000));
+  dv.setUint32(total - 4, (len << 3) >>> 0);
+  const w = new Uint32Array(64);
+  const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let off = 0; off < total; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+    }
+    let [a, b, c, d, e, f, g, hh] = H;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+      const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0] += a; H[1] += b; H[2] += c; H[3] += d; H[4] += e; H[5] += f; H[6] += g; H[7] += hh;
+  }
+  return [...H].map((x) => x.toString(16).padStart(8, '0')).join('');
 }
 
 async function enableImported(sel, shown) {
@@ -1972,19 +2018,19 @@ function renderSettings() {
   ];
   const done = checks.filter((c) => c[0] === true).length;
   const list = h('ul', { class: 'status-list' }, checks.map((c) => checkItem(...c)));
-  const checklist = sCard('check', 'Setup checklist', done === checks.length ? 'Everything is ready.' : `${done} of ${checks.length} ready`,
+  const checklist = () => sCard('check', 'Setup checklist', done === checks.length ? 'Everything is ready.' : `${done} of ${checks.length} ready`,
     h('button', { class: 'small ghost', title: 'Check again', onclick: refreshStatus }, icon('refresh'), 'Re-check'),
     h('div', { class: 'checklist-progress', 'aria-hidden': 'true' }, h('div', { class: 'progress' }, h('span', { style: { width: `${Math.round(100 * done / checks.length)}%` } }))),
     list);
 
   // ----- Twitch (lives on its own page)
-  const twitchCard = sCard('twitch', 'Twitch', tw.linked && tw.user && tw.user.display_name ? `Linked as ${tw.user.display_name}` : null, null,
+  const twitchCard = () => sCard('twitch', 'Twitch', tw.linked && tw.user && tw.user.display_name ? `Linked as ${tw.user.display_name}` : null, null,
     h('p', { class: 'muted', text: 'Linking, title and chat live on the Twitch page.' }),
     h('div', { class: 'card-foot' }, h('button', { class: 'twitch', onclick: () => go('twitch') }, icon('twitch'), 'Open the Twitch page')));
 
   // ----- OBS scenes
   const out = h('pre', { class: 'output', hidden: true });
-  const obsCard = sCard('layers', 'OBS scenes', 'Creates a new OBS profile and scene collection (Starting Soon, Screen, Game, Camera, BRB, Ending). Your existing ones are not changed.', null,
+  const obsCard = () => sCard('layers', 'OBS scenes', 'Creates a new OBS profile and scene collection (Starting Soon, Screen, Game, Camera, BRB, Ending). Your existing ones are not changed.', null,
     h('div', { class: 'grid cols-2 fields' },
       sField('obs_setup.profile', 'Profile name', { placeholder: 'Stream Deck' }),
       sField('obs_setup.collection', 'Scene collection name', { placeholder: 'Stream Deck' }),
@@ -2025,7 +2071,7 @@ function renderSettings() {
     }), h('button', { class: 'small', onclick: () => { pushUndo(); polls.push({ question: '', options: [] }); cfgSet('brb.polls', polls); markDirty(); drawPolls(); } }, icon('plus'), 'Add poll'));
   };
   drawPolls();
-  const brbCard = sCard('clock', 'BRB screen', 'What viewers see while you’re away.', null,
+  const brbCard = () => sCard('clock', 'BRB screen', 'What viewers see while you’re away.', null,
     h('div', { class: 'grid cols-2 fields' },
       sField('brb.media_dir', 'Media folder', { placeholder: '~/Stream/brb' }, 'Put videos in its “videos” folder; they play while you’re away.'),
       sField('brb.chat_lines', 'Chat lines shown', { type: 'number', min: 1, max: 20 }),
@@ -2034,7 +2080,7 @@ function renderSettings() {
     h('h3', { class: 'subhead', text: 'Chat polls' }), pollBox);
 
   // ----- Deck
-  const deckCard = sCard('deck', 'Deck', S.devices.length > 1 ? 'Defaults for every deck. Each deck can change them under Decks.'
+  const deckCard = () => sCard('deck', 'Deck', S.devices.length > 1 ? 'Defaults for every deck. Each deck can change them under Decks.'
     : st.deck ? `This deck: ${st.deck.model}` : 'No deck connected', null,
     h('div', { class: 'grid cols-2 fields' },
       sField('brightness', 'Brightness (%)', { type: 'number', min: 0, max: 100 }),
@@ -2043,7 +2089,7 @@ function renderSettings() {
 
   // ----- Home Assistant
   const haToken = h('input', { type: 'password', placeholder: S.secrets.ha_token ? '•••••••• (saved; type to replace)' : 'long-lived access token', autocomplete: 'off' });
-  const haCard = sCard('home', 'Home Assistant', 'Optional: control lights and scenes from keys.', null,
+  const haCard = () => sCard('home', 'Home Assistant', 'Optional: control lights and scenes from keys.', null,
     h('div', { class: 'grid cols-2 fields' },
       sField('home_assistant.url', 'Address', { placeholder: 'http://homeassistant.local:8123' }),
       field('Access token', haToken, 'Profile → Security → Long-lived access tokens. Stored in its own private file, not in the config.')),
@@ -2051,7 +2097,7 @@ function renderSettings() {
 
   // ----- OBS remote
   const obsPw = h('input', { type: 'password', placeholder: S.secrets.obs_password ? '•••••••• (saved)' : 'only for OBS on another computer', autocomplete: 'off' });
-  const remoteCard = sCard('monitor', 'OBS on another computer', 'Optional. Leave empty when OBS runs on this computer: the connection details are read from OBS automatically.', null,
+  const remoteCard = () => sCard('monitor', 'OBS on another computer', 'Optional. Leave empty when OBS runs on this computer: the connection details are read from OBS automatically.', null,
     h('div', { class: 'grid cols-2 fields' },
       sField('obs.host', 'OBS computer address', { placeholder: 'localhost' }),
       sField('obs.port', 'Port', { type: 'number', placeholder: '4455' }),
@@ -2059,17 +2105,188 @@ function renderSettings() {
     h('div', { class: 'card-foot' }, h('button', { class: 'small', onclick: () => saveSecret('obs_password', obsPw.value) }, icon('lock'), 'Save password')));
 
   // ----- panel access
-  const accessCard = sCard('lock', 'Panel access', 'Every open copy of this panel, on any device, holds its own sign-in.', null,
+  const accessCard = () => sCard('lock', 'Panel access', 'Every open copy of this panel, on any device, holds its own sign-in.', null,
     h('p', { class: 'muted', text: 'Use this if you left a panel open somewhere you don’t trust, or shared a link by mistake.' }),
     h('div', { class: 'card-foot' }, asyncButton({ class: 'small danger' }, signOutAll, icon('lock'), 'Sign out all panels')));
 
+  const remoteAccess = () => remoteAccessCard(st.remote);
+
+  const tab = innerTab('settings') || 'general';
+  const TABS = {
+    general: ['General', 'Setup status, your Twitch link and your Stream Decks.',
+      () => [h('div', { class: 'settings-aside' }, checklist(), existingSetupCard()),
+        h('div', { class: 'settings-main' }, twitchCard(), decksCard(), deckCard())]],
+    obs: ['OBS', 'How the panel talks to OBS and the scenes it builds.', () => [obsCard(), remoteCard()]],
+    brb: ['BRB & radio', 'The away screen, chat polls and your radio folder.', () => [brbCard()]],
+    home: ['Home Assistant', 'Control lights and scenes from your keys.', () => [haCard()]],
+    access: ['Access', 'Who can open this panel, and from where.', () => [accessCard(), remoteAccess()]],
+    backups: ['Backups', 'Restore an earlier config or copy it somewhere safe.', () => [historyCard(), externalBackupsCard()]],
+  };
+  const [tabName, tabSub, build] = TABS[tab] || TABS.general;
   const wrap = h('div', { class: 'settings' },
     h('div', { class: 'page-head' }, h('div', { class: 'page-titles' }, h('h1', { class: 'page-title', text: 'Settings' }),
-      h('p', { class: 'page-sub', text: 'Connections, OBS scenes and the BRB screen. Changes are saved with Save.' }))),
-    h('div', { class: 'settings-aside' }, checklist, existingSetupCard(), twitchCard, accessCard),
-    h('div', { class: 'settings-main' }, decksCard(), obsCard, brbCard, deckCard, haCard, remoteCard),
-    historyCard(), externalBackupsCard());
+      h('p', { class: 'page-sub', text: tabSub + ' Changes are saved with Save.' }))),
+    h('div', { class: 'settings-panel settings-' + (TABS[tab] ? tab : 'general'), role: 'tabpanel', 'aria-label': tabName }, ...build()));
   v.replaceChildren(wrap);
+}
+
+/* ----- Remote access card */
+
+function ago(unix) {
+  const d = Math.max(0, Math.round(Date.now() / 1000 - unix));
+  if (d < 60) return 'just now';
+  if (d < 3600) return `${Math.floor(d / 60)} min ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)} h ago`;
+  return `${Math.floor(d / 86400)} d ago`;
+}
+
+/** "5 min", "3 h", "12 d" until a unix time, or null once it has passed. */
+function timeLeft(unix) {
+  const d = Math.round(unix - Date.now() / 1000);
+  if (d <= 0) return null;
+  if (d < 60) return 'under a minute';
+  if (d < 3600) return `${Math.floor(d / 60)} min`;
+  if (d < 86400) return `${Math.floor(d / 3600)} h`;
+  return `${Math.floor(d / 86400)} d`;
+}
+
+function raEdit(path, v) {
+  if (!S.pendingUndo) { pushUndo(); S.pendingUndo = true; }
+  cfgSet(path, v);
+  markDirty();
+}
+
+function remoteAccessCard(rs) {
+  const enabled = cfgGet('editor.remote.enabled') === true;
+  const listen = cfgGet('editor.remote.listen') || '0.0.0.0';
+  const port = cfgGet('editor.remote.port');
+  const days = cfgGet('editor.remote.device_days');
+  const hosts = Array.isArray(cfgGet('editor.remote.hosts')) ? cfgGet('editor.remote.hosts') : [];
+
+  const sw = switchInput(enabled, async (on) => {
+    if (on) {
+      const ok = await confirmDialog('Allow other devices?',
+        'Devices you approve can control this computer: run commands, OBS and your Twitch channel. Each device needs your approval here, with a code shown on both screens.',
+        { ok: 'Turn on remote access', danger: true });
+      if (!ok) { sw.querySelector('input').checked = false; return; }
+    }
+    pushUndo(); S.pendingUndo = false;
+    cfgSet('editor.remote.enabled', on ? true : undefined);
+    markDirty();
+    renderSettings();
+  }, 'Allow other devices');
+
+  // listen picker: the two wildcards, each detected address, and the saved value even if it has gone away
+  const addrs = Array.isArray(rs && rs.addresses) ? rs.addresses : [];
+  const opts = [['0.0.0.0', 'Every address (IPv4)'], ['::', 'Every address (IPv4 and IPv6)'], ...addrs.map((a) => [a, a])];
+  if (!opts.some(([v]) => v === listen)) opts.push([listen, `${listen} (not found now)`]);
+  const listenSel = h('select', {}, opts.map(([v, t]) => h('option', { value: v, text: t, selected: v === listen })));
+  listenSel.addEventListener('change', () => raEdit('editor.remote.listen', listenSel.value === '0.0.0.0' ? undefined : listenSel.value));
+
+  const portIn = h('input', { type: 'number', min: 1024, max: 65535, step: 1, value: port === undefined ? '' : port, placeholder: '8767' });
+  portIn.addEventListener('change', () => {
+    if (portIn.value === '') return raEdit('editor.remote.port', undefined);
+    const n = Math.min(65535, Math.max(1024, Math.round(Number(portIn.value)) || 8767));
+    portIn.value = n;
+    raEdit('editor.remote.port', n);
+  });
+
+  const hostsIn = h('input', { type: 'text', value: hosts.join(', '), placeholder: 'streampc.lan', autocomplete: 'off', spellcheck: 'false' });
+  hostsIn.addEventListener('input', () => {
+    const list = [...new Set(hostsIn.value.split(/[\s,]+/).map((x) => x.trim().toLowerCase()).filter(Boolean))];
+    raEdit('editor.remote.hosts', list.length ? list : undefined);
+  });
+
+  const daysIn = h('input', { type: 'number', min: 1, max: 365, step: 1, value: days === undefined ? '' : days, placeholder: '30' });
+  daysIn.addEventListener('change', () => {
+    if (daysIn.value === '') return raEdit('editor.remote.device_days', undefined);
+    const n = Math.min(365, Math.max(1, Math.round(Number(daysIn.value)) || 30));
+    daysIn.value = n;
+    raEdit('editor.remote.device_days', n);
+  });
+
+  const decide = (p, allow) => asyncButton({ class: 'small' + (allow ? ' primary' : ' ghost'), 'aria-label': `${allow ? 'Allow' : 'Deny'} ${p.name || 'device'}` }, async () => {
+    await api('/api/remote/decide', { request: p.id, allow });
+    await refreshStatus();
+    renderSettings();
+  }, allow ? 'Allow' : 'Deny');
+
+  const revoke = (d) => asyncButton({ class: 'small danger', 'aria-label': `Revoke ${d.name || 'device'}` }, async () => {
+    const ok = await confirmDialog(`Revoke ${d.name || 'this device'}?`,
+      'It is signed out now and must ask for approval again before it can use this panel.',
+      { ok: 'Revoke device', danger: true });
+    if (!ok) return;
+    await api('/api/remote/revoke', { device: d.id });
+    await refreshStatus();
+    renderSettings();
+  }, 'Revoke');
+
+  const status = [];
+  if (!rs) {
+    status.push(h('p', { class: 'muted', text: 'Remote access isn’t available in this version.' }));
+  } else {
+    const urls = Array.isArray(rs.urls) ? rs.urls : [];
+    if (rs.enabled && urls.length) {
+      status.push(h('div', {}, h('div', { class: 'ra-label', text: 'Open the panel from another device at' }),
+        ...urls.map((u) => h('div', { class: 'ra-url' }, h('a', { href: u, target: '_blank', rel: 'noopener', text: u }),
+          h('button', { class: 'small ghost', title: 'Copy link', 'aria-label': `Copy ${u}`, onclick: async () => {
+            try { await navigator.clipboard.writeText(u); toast('Link copied'); } catch { toast('Couldn’t copy; select the link and copy it.', { bad: true }); }
+          } }, icon('copy'), 'Copy')))));
+    } else if (!rs.enabled) {
+      status.push(h('p', { class: 'muted', text: enabled ? 'Not listening yet. Save, and it starts.' : 'Remote access is off.' }));
+    }
+    if (rs.error) status.push(h('div', { class: 'note warn', text: rs.error }));
+
+    if (rs.enabled) {
+      const pending = Array.isArray(rs.pending) ? rs.pending : [];
+      if (!REMOTE) {
+        status.push(h('h3', { class: 'subhead', text: 'Waiting for approval' }),
+          pending.length
+            ? h('ul', { class: 'ra-list' }, pending.map((p) => {
+              const left = timeLeft(p.expires);
+              return h('li', {},
+                h('div', { class: 'ra-main' },
+                  h('span', { class: 'ra-who', text: p.name || 'Unnamed device' }),
+                  h('span', { class: 'ra-meta', text: [p.ip, left ? `${left} left` : 'expired'].filter(Boolean).join(' · ') })),
+                h('span', { class: 'ra-code', 'aria-label': `Code ${String(p.code || '').split('').join(' ')}`, text: String(p.code || '').replace(/(.{3})(?=.)/g, '$1 ') }),
+                h('div', { class: 'ra-actions' }, decide(p, false), decide(p, true)));
+            }))
+            : h('p', { class: 'muted', text: 'No devices are asking to connect.' }));
+      }
+      const devices = Array.isArray(rs.devices) ? rs.devices : [];
+      status.push(h('h3', { class: 'subhead', text: 'Approved devices' }),
+        devices.length
+          ? h('ul', { class: 'ra-list' }, devices.map((d) => {
+            const left = d.expires ? timeLeft(d.expires) : null;
+            const mine = rs.this_device && d.id === rs.this_device;
+            return h('li', {},
+              h('div', { class: 'ra-main' },
+                h('span', { class: 'ra-who' }, d.name || 'Unnamed device', mine && h('span', { class: 'badge', text: 'This device' })),
+                h('span', { class: 'ra-meta', text: [d.ip, d.last_seen ? `last used ${ago(d.last_seen)}` : 'never used', d.expires ? (left ? `expires in ${left}` : 'expired') : null].filter(Boolean).join(' · ') })),
+              !REMOTE && h('div', { class: 'ra-actions' }, revoke(d)));
+          }))
+          : h('p', { class: 'muted', text: 'No devices are approved yet. A device that opens the address above will appear here to approve.' }));
+    }
+  }
+
+  // Who may get in remotely is decided only at the streaming computer itself; the daemon refuses
+  // such a change from a remote panel anyway.
+  if (REMOTE) {
+    sw.querySelector('input').disabled = true;
+    [listenSel, portIn, hostsIn, daysIn].forEach((el) => { el.disabled = true; });
+  }
+  return sCard('monitor', 'Remote access', 'Use this panel from your phone or another computer.', null,
+    h('div', { class: 'ra-switch' }, sw),
+    h('div', { class: 'grid cols-2 fields' },
+      field('Listen on', listenSel),
+      field('Port', portIn, '1024 to 65535. Blank means 8767.'),
+      field('Extra host names', hostsIn, 'Names you type in the address bar besides this computer’s address, e.g. streampc.lan.'),
+      field('Approved devices stay signed in for (days)', daysIn, '1 to 365. Blank means 30.')),
+    h('div', { class: 'ra-status' }, ...status),
+    enabled && h('div', { class: 'note warn', text: 'The connection isn’t encrypted. Use it on a network you trust, or over a VPN.' }),
+    REMOTE
+      ? h('div', { class: 'note warn', text: 'You’re using this panel from another device, so remote access can only be changed on the streaming computer.' })
+      : h('p', { class: 'hint', text: 'Changes apply after Save.' }));
 }
 
 async function signOutAll() {

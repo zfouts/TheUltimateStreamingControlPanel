@@ -1,0 +1,41 @@
+/* Pairing a remote device (pairing.js) and approving one on this computer (main.js). */
+
+/* A remote device that isn't approved yet sees only the brand and the pairing card: the
+   navigation, status chips and section tabs would only lead to errors. */
+body.is-pairing .nav, body.is-pairing .topbar, body.is-pairing #section-tabs, body.is-pairing .sidebar-foot .conn { display: none; }
+.pairing { display: grid; place-items: start center; padding: var(--s-10) var(--s-4); }
+.pairing-card { width: min(460px, 100%); display: flex; flex-direction: column; gap: var(--s-4); padding: var(--s-8); text-align: center; align-items: stretch; }
+.pairing-title { font-size: var(--fs-xl); line-height: 1.25; }
+.pairing-text { color: var(--text-2); font-size: var(--fs-md); line-height: 1.5; }
+.pairing-text.err { color: var(--bad); }
+.pairing-form { display: flex; flex-direction: column; gap: var(--s-4); text-align: left; }
+.pairing-form .help.error:empty { display: none; }
+.pairing-form button, .pairing-card > button { width: 100%; min-height: 44px; font-size: var(--fs-md); }
+.pairing-form input { min-height: 44px; font-size: 16px; }   /* 16px stops iOS zooming on focus */
+.pairing-status { color: var(--warn); min-height: 1.4em; font-size: var(--fs-base); }
+.pairing-left { font-variant-numeric: tabular-nums; color: var(--text); }
+
+.pairing-code, .pair-code { display: flex; justify-content: center; gap: var(--s-2); font-family: var(--mono); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.pairing-code { margin: var(--s-2) 0; }
+.pairing-code .digit {
+  width: clamp(36px, 12vw, 52px); padding: var(--s-3) 0; font-size: clamp(var(--fs-2xl), 9vw, 40px); line-height: 1;
+  background: var(--panel-2); border: 1px solid var(--line-2); border-radius: var(--r); box-shadow: var(--shadow-1);
+}
+.pairing-code .digit.gap { margin-left: var(--s-3); }
+
+.pair-ask { display: flex; flex-direction: column; gap: var(--s-4); }
+.pair-device { font-size: var(--fs-md); overflow-wrap: anywhere; }
+.pair-codelabel { color: var(--muted); font-size: var(--fs-sm); text-align: center; margin-bottom: calc(var(--s-2) * -1); }
+.pair-code {
+  justify-content: center; font-size: var(--fs-3xl); letter-spacing: .18em; padding: var(--s-4);
+  background: var(--panel-2); border: 1px solid var(--line-2); border-radius: var(--r);
+}
+
+@media (max-width: 480px) {
+  .pairing { padding: var(--s-6) var(--s-3); }
+  .pairing-card { padding: var(--s-5); }
+}
+
+.pair-more { color: var(--warn); font-size: var(--fs-sm); margin-top: calc(var(--s-2) * -1); }
+.pair-actions { flex-wrap: wrap; }
+.pair-later { color: var(--muted); font-size: var(--fs-sm); text-align: center; }

@@ -1029,6 +1029,10 @@ function fmtTime(ts) {
 }
 
 function msgNode(m) {
+  if (m.system) {
+    return h('li', { class: 'tw-msg tw-msg-system', tabindex: '-1' },
+      h('span', { class: 'tw-time', text: fmtTime(m.ts) }), h('span', { class: 'tw-line' }, h('span', { class: 'tw-text', text: String(m.text || '') })));
+  }
   const user = String(m.user || '?');
   const badges = (Array.isArray(m.badges) ? m.badges : []).filter((b) => Object.prototype.hasOwnProperty.call(BADGES, b));
   const nameEl = h('span', { class: 'tw-user', text: user });
@@ -1421,6 +1425,10 @@ export async function mount(root) {
   render();
   on('twitch_auth', (a) => applyAuth(a));
   on('chat', (m) => addChat(m));
+  on('automod', (d) => {
+    const e = d && d.entry;
+    if (e && e.state === 'queued') addChat({ system: true, ts: e.at, text: `Auto-mod hid a message from ${e.user} (matched “${e.term}”)` });
+  });
   on('status', (sn) => onStatus(sn));
   on('config', () => { if (S.visible) refreshAuth(); });
   api('/api/live/snapshot').then(onStatus).catch(() => {});

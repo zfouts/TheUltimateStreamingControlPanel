@@ -15,7 +15,10 @@
 <link rel="stylesheet" href="css/onboarding.css">
 <link rel="stylesheet" href="css/plugins.css">
 <link rel="stylesheet" href="css/announce.css">
+<link rel="stylesheet" href="css/automod.css">
 <link rel="stylesheet" href="css/discord.css">
+<link rel="stylesheet" href="css/settings.css">
+<link rel="stylesheet" href="css/pairing.css">
 <script type="module" src="js/main.js"></script>
 </head>
 <body>
@@ -27,11 +30,8 @@
       <button aria-label="Live" data-view="live" aria-current="page" title="Live (1)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM7.1 7.1a7 7 0 0 0 0 9.8m9.8 0a7 7 0 0 0 0-9.8M4.2 4.2a11 11 0 0 0 0 15.6m15.6 0a11 11 0 0 0 0-15.6"/></svg><span class="txt">Live</span><span class="kbd" aria-hidden="true">1</span></button>
       <button aria-label="Deck" data-view="deck" aria-current="false" title="Deck (2)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2zM7 13h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/></svg><span class="txt">Deck</span><span class="kbd" aria-hidden="true">2</span></button>
       <button aria-label="Twitch" data-view="twitch" aria-current="false" title="Twitch (3)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h15v11l-4 4h-4l-3 3v-3H5zM11 8v4m4-4v4"/></svg><span class="txt">Twitch</span><span class="kbd" aria-hidden="true">3</span></button>
-      <button aria-label="Twitch Bot" data-view="bot" data-parent="twitch" class="nav-sub" aria-current="false" title="Twitch Bot (4)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3zm2 6v2m6-2v2m-6 3.5h6M1.5 12v3m21-3v3"/></svg><span class="txt">Twitch Bot</span><span class="kbd" aria-hidden="true">4</span></button>
-      <button aria-label="Announcements" data-view="announce" data-parent="twitch" class="nav-sub" aria-current="false" title="Announcements"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4a1 1 0 0 0 1 1h3l8 4V5L7 9H4a1 1 0 0 0-1 1zm15.5-.5a4 4 0 0 1 0 5"/></svg><span class="txt">Announcements</span></button>
-      <button aria-label="OBS" data-view="obs" aria-current="false" title="OBS (5)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 6.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM7.8 12.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM16.2 12.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg><span class="txt">OBS</span><span class="kbd" aria-hidden="true">5</span></button>
-      <button aria-label="Settings" data-view="settings" aria-current="false" title="Settings (6)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9m4 0h3M4 12h3m4 0h9M4 18h11m4 0h1M15 4v4M9 10v4m8 2v4"/></svg><span class="txt">Settings</span><span class="kbd" aria-hidden="true">6</span></button>
-      <button aria-label="Discord" data-view="discord" data-parent="settings" class="nav-sub" aria-current="false" title="Discord webhooks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm5 6h.01M15 11h.01"/></svg><span class="txt">Discord</span></button>
+      <button aria-label="OBS" data-view="obs" aria-current="false" title="OBS (4)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 6.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM7.8 12.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM16.2 12.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg><span class="txt">OBS</span><span class="kbd" aria-hidden="true">4</span></button>
+      <button aria-label="Settings" data-view="settings" aria-current="false" title="Settings (5)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9m4 0h3M4 12h3m4 0h9M4 18h11m4 0h1M15 4v4M9 10v4m8 2v4"/></svg><span class="txt">Settings</span><span class="kbd" aria-hidden="true">5</span></button>
       <div id="plugin-nav" class="nav-plugins" role="group" aria-label="Plugins" hidden></div>
     </nav>
     <div class="sidebar-foot">
@@ -42,7 +42,7 @@
 
   <div class="content">
     <header class="topbar">
-      <div class="chips" id="status" aria-label="Connections" aria-live="polite"></div>
+      <div class="topbar-chips"><div class="chips" id="status" aria-label="Connections" aria-live="polite"></div><span id="remote-chip" class="remote-chip" title="You are using this panel from another device" hidden>Remote</span></div>
       <div class="actions" id="editor-actions" hidden>
         <button id="undo" class="ghost icon-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
         <button id="redo" class="ghost icon-btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5m5 5H9a5 5 0 0 0 0 10h3"/></svg></button>
@@ -54,6 +54,7 @@
     <div id="fallback-banner" class="fallback-banner" role="alert" hidden><span id="fallback-text"></span><button id="fallback-link" class="small" type="button">Open Backups</button></div>
 
     <main>
+      <nav id="section-tabs" class="tabs section-tabs" hidden></nav>
       <div id="fatal" class="fatal" hidden></div>
       <section id="view-live" class="view" aria-label="Live"></section>
       <section id="view-deck" class="view" hidden aria-label="Deck keys">
@@ -100,6 +101,7 @@
       <section id="view-twitch" class="view" hidden aria-label="Twitch"></section>
       <section id="view-bot" class="view" hidden aria-label="Twitch Bot"></section>
       <section id="view-announce" class="view" hidden aria-label="Announcements"></section>
+      <section id="view-automod" class="view" hidden aria-label="Moderation"></section>
       <section id="view-discord" class="view" hidden aria-label="Discord"></section>
       <section id="view-obs" class="view" hidden aria-label="OBS"></section>
       <section id="view-plugin" class="view" hidden aria-label="Plugin"></section>

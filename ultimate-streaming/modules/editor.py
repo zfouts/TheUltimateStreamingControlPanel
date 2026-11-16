@@ -3,7 +3,8 @@
 Open it with `python3 main.py --open-editor`, the "The Ultimate Streaming Control Panel for Linux" app-menu entry
 that install.sh adds, or a deck key with `action: {editor: open}`.
 
-Security: it listens on 127.0.0.1 only, checks the Host and Origin headers (so other
+Security: the panel listens on 127.0.0.1 only (remote access, below, is separate and off by
+default), checks the Host and Origin headers (so other
 websites and DNS-rebinding tricks can't reach it), and every API call needs the random
 token from ~/.config/ultimate-streaming/editor_token, which only your user can read and which
 is replaced each time the daemon starts. Whoever holds that token can do what the deck can do,
@@ -13,19 +14,36 @@ launch code, never the token (see core/editor_auth.py). Twitch tokens never leav
 If the port is taken, the server keeps trying to bind it (BIND_RETRY), and no panel link is
 handed out until it has: whoever holds the port would get it.
 
+Remote access (editor.remote, off by default) runs a second listener for other devices (phone,
+laptop) on editor.remote.listen:editor.remote.port; the 127.0.0.1 panel and its launch codes are
+unchanged. A device pairs: it asks for access and shows a 6-digit code; the same request pops up
+in the panel here (and as a desktop notification), and someone at this computer approves it if
+the codes match. The device then uses its own token. Only the panel on this computer can approve,
+deny or revoke devices or change the `editor` section. core/remote_access.py has the trust model,
+core/webapi/server.py the checks each remote request passes. A change to editor.remote restarts
+only that listener; turning it off cancels waiting requests but keeps approved devices.
+
 Routes live in core/webapi/*_api.py (live, obs, twitch, plugins, ...); this file keeps the config
-editor's own routes and the server lifecycle.
+editor's own routes, pairing, and the server lifecycle.
 
 config.yaml (optional):
     editor:
       port: 8765
       enabled: true
+      remote:
+        enabled: false        # true: listen for other devices too
+        listen: "0.0.0.0"     # "0.0.0.0" every IPv4 address, "::" IPv4 and IPv6, or one address
+        port: 8767            # must differ from editor.port
+        hosts: []             # extra names other devices type in the address bar
+        device_days: 30       # how long an approval lasts (1-365)
 """
 import base64
+import collections
 import errno
 import glob
 import io
 import logging
+import math
 import os
 import pwd
 import re
@@ -36,17 +54,20 @@ from http.server import ThreadingHTTPServer
 
 import yaml
 
-from core import Module, action, listener, open_url, task
-from core import configio, editor_auth
+from core import Module, action, listener, notify, open_url, task
+from core import configio, editor_auth, request_context
 from core.bot import is_blank, resolve_key
 from core.models import as_dicts as model_table
-from core.paths import ROOT, state_file
+from core.paths import ROOT, state_dir, state_file
+from core.remote_access import (DEFAULT_PORT as REMOTE_PORT, Devices, Pairing, PeerLimit, Refused, clean_name,
+                                is_loopback, normalize_ip, urls)
 from core.render import ICON_DIRS, Renderer, valid_color
 from core.safefs import write_atomic
 from core.schema import UI, Choice
-from core.webapi import (ApiError, Router, announce_api, backup_api, bot_api, discord_api, import_api, live_api,
+from core.webapi import (ApiError, Router, announce_api, automod_api, backup_api, bot_api, discord_api, import_api, live_api,
                          obs_api, plugin_api, setup_api, twitch_api)
-from core.webapi.server import FailureLimit, Handler
+from core.webapi.server import (LOCAL_ONLY_MESSAGE, MAX_SUBSCRIBERS, AddressCache, FailureLimit, Handler,
+                                RemoteServer, StreamSlots, WarnLimit)
 
 STATIC_DIR = os.path.join(ROOT, "editor")
 SECRETS = {"ha_token": ("home_assistant", "token_file"), "obs_password": ("obs", "password_file")}
@@ -54,6 +75,11 @@ STATUS_EVERY = 2
 MAX_RENDER_KEYS = 256   # the library preview sends every saved key in one request
 MAX_PARSE_BYTES = 1024 * 1024
 BIND_RETRY = (2, 60)    # seconds: first wait after a busy port, doubling up to the second
+PAIR_SWEEP_EVERY = 5    # seconds: how often requests that expired unanswered are announced as done
+DEVICE_DAYS = (1, 365, 30)   # editor.remote.device_days: lowest, highest, default
+
+# editor.remote as the listener uses it; `error` says why it can't run (None: it can, or it's off)
+RemoteSettings = collections.namedtuple("RemoteSettings", "enabled listen port hosts days error")
 
 
 REDACT = re.compile(r"(?i)(bearer\s+|access_token\W+|refresh_token\W+|device_code\W+|oauth:|\bkey=|"
@@ -97,26 +123,46 @@ class Editor(Module):
         if hasattr(self, "router") and wanted != self.running_as:
             self._stop()
             self._start()
+        if hasattr(self, "router"):
+            self._apply_remote()
 
     def on_load(self):
         self.server, self.running_as = None, None
         self.server_lock, self.bind_stop = threading.Lock(), None
+        # remote access: its own listener, never self.server, and never marked bound in editor_auth
+        self.remote_server, self.remote_stop, self.remote_error = None, None, None
+        self.remote_lock, self.remote_running_as = threading.Lock(), None
+        self.remote = self._remote_settings()
+        self.addresses = AddressCache()
+        self.peer_limit = PeerLimit()
+        self.warn_limit = WarnLimit()
+        self.pairing = Pairing()
+        try:
+            devices_path = state_file("remote_devices.json")
+        except OSError:   # an unusable state folder: approving a device fails then, with its error
+            devices_path = os.path.join(state_dir(), "remote_devices.json")
+        self.devices = Devices(devices_path, days=self.remote.days)   # approved devices outlive the listener
+        self.pair_lock = threading.Lock()   # start/decide/sweep: pair_request before its pair_done
+        self.announced = {}                 # request id -> its expiry, for requests published as pair_request
+        self.devices_seen = set()           # ids of devices that have used their token this run
         self.renderers = {}
         self.icon_names = None
         self.hub = self.bot.hub
         self.last_status = None
         self.router = Router()
         self._routes()
-        for api in (live_api, obs_api, twitch_api, bot_api, announce_api, discord_api, backup_api, import_api,
+        for api in (live_api, obs_api, twitch_api, bot_api, announce_api, automod_api, discord_api, backup_api, import_api,
                     setup_api, plugin_api):
             api.register(self.router, self)
         self.log_handler = _LogHandler(self.hub)
         logging.getLogger().addHandler(self.log_handler)
         self._start()
+        self._start_remote(self.remote)
 
     def on_unload(self):
         logging.getLogger().removeHandler(self.log_handler)
         self._stop()
+        self._stop_remote()
 
     # ----- server lifecycle
 
@@ -157,6 +203,7 @@ class Editor(Module):
         server.static_dir = STATIC_DIR
         server.stopping = threading.Event()
         server.session_limit = FailureLimit()
+        server.stream_slots = StreamSlots(MAX_SUBSCRIBERS)   # counts this listener's streams only
         with self.server_lock:
             if stop.is_set():   # stopped (or restarted on another port) meanwhile
                 server.server_close()
@@ -186,12 +233,265 @@ class Editor(Module):
             server.shutdown()
             server.server_close()
 
+    # ----- the remote listener's lifecycle
+
+    def _remote_settings(self):
+        """editor.remote, checked: RemoteSettings. Bad values are never widened: they keep the
+        listener off with a readable `error` (device_days is clamped instead)."""
+        cfg = self.config if isinstance(self.config, dict) else {}
+        rc = cfg.get("remote") if isinstance(cfg.get("remote"), dict) else {}
+        enabled = rc.get("enabled") is True
+        listen, error = rc.get("listen"), None
+        listen = "0.0.0.0" if listen is None else listen
+        try:
+            listen = normalize_ip(listen)
+        except ValueError:
+            listen = str(listen)[:80]
+            error = "editor.remote.listen must be 0.0.0.0, :: or one IP address of this computer"
+        port = rc.get("port")
+        port = REMOTE_PORT if port is None else port
+        try:
+            if isinstance(port, bool) or (isinstance(port, float) and not port.is_integer()):
+                raise ValueError
+            port = int(port)
+            if not 0 < port < 65536:
+                raise ValueError
+        except (TypeError, ValueError):
+            port, error = REMOTE_PORT, error or "editor.remote.port must be a number from 1 to 65535"
+        try:
+            panel_port = int(cfg.get("port", editor_auth.DEFAULT_PORT))
+        except (TypeError, ValueError):
+            panel_port = None
+        if error is None and port == panel_port:
+            error = (f"editor.remote.port is {port}, the same as editor.port; pick another port for remote "
+                     "access (the default is 8767)")
+        if error is None and not cfg.get("enabled", True):
+            error = "The control panel is off (editor.enabled is false), so remote access is off too"
+        raw = rc.get("hosts")
+        items = [raw] if isinstance(raw, str) else raw if isinstance(raw, (list, tuple)) else []
+        hosts = tuple(dict.fromkeys(h for h in items if isinstance(h, str)))   # (allowed_hosts drops junk)
+        low, high, default = DEVICE_DAYS
+        days = rc.get("device_days", default)
+        if isinstance(days, bool) or not isinstance(days, (int, float)) or not math.isfinite(days):
+            days = default
+        days = min(high, max(low, days))
+        return RemoteSettings(enabled, listen, port, hosts, days, error if enabled else None)
+
+    def _apply_remote(self):
+        """After a config change: device_days applies at once; any other change to editor.remote
+        restarts the remote listener only. Turned off: waiting requests are cancelled."""
+        s = self.remote = self._remote_settings()
+        self.devices.days = s.days
+        if s._replace(days=None) == self.remote_running_as:
+            return
+        self._stop_remote()
+        if not s.enabled or s.error:
+            self._cancel_pairing()
+        self._start_remote(s)
+
+    def _start_remote(self, s):
+        with self.remote_lock:
+            self.remote_running_as = s._replace(days=None)
+            self.remote_error = s.error
+        if not s.enabled or s.error:
+            if s.error:
+                self.log.warning("remote access: %s", s.error)
+            return
+        if is_loopback(s.listen) and s.listen not in ("0.0.0.0", "::"):
+            self.log.warning("remote access: editor.remote.listen is %s, which only this computer can reach, and "
+                             "requests from this computer are refused there; use 0.0.0.0, :: or a network address",
+                             s.listen)
+        stop = self.remote_stop = threading.Event()
+        if not self._bind_remote(s, stop, first=True) and not stop.is_set():
+            threading.Thread(target=self._bind_remote_retry, args=(s, stop), daemon=True,
+                             name="editor-remote-bind").start()
+
+    def _bind_remote(self, s, stop, first=False):
+        """Listen for other devices. True when done (listening, or given up for good); False to retry
+        (the port is busy, or the address isn't on this computer yet, e.g. the network is still coming up)."""
+        where = f"[{s.listen}]:{s.port}" if ":" in s.listen else f"{s.listen}:{s.port}"
+        try:
+            server = RemoteServer(s.listen, s.port, s.hosts, self, STATIC_DIR)
+        except OSError as e:
+            retry = e.errno in (errno.EADDRINUSE, errno.EADDRNOTAVAIL)
+            if e.errno == errno.EADDRINUSE:
+                why = f"Port {s.port} is in use by another program, so remote access isn't listening yet (retrying)"
+            elif e.errno == errno.EADDRNOTAVAIL:
+                why = (f"{s.listen} isn't an address of this computer right now, so remote access isn't "
+                       "listening yet (retrying)")
+            elif e.errno == errno.EAFNOSUPPORT:
+                why = "This computer has no IPv6, so remote access can't listen on it; set editor.remote.listen to 0.0.0.0"
+            else:
+                why = f"Remote access can't listen on {where}: {e.strerror or e}"
+            with self.remote_lock:
+                if stop.is_set():
+                    return True
+                self.remote_error = why
+            if first or not retry:
+                self.log.warning("remote access: %s", why)
+            else:
+                self.log.debug("remote access: %s still can't listen: %s", where, e.strerror or e)
+            return not retry
+        with self.remote_lock:
+            if stop.is_set():   # stopped (or restarted with other settings) meanwhile
+                server.server_close()
+                return True
+            self.remote_server, self.remote_error = server, None
+            threading.Thread(target=server.serve_forever, daemon=True, name="editor-remote").start()
+        self.log.info("remote access: listening on %s for other devices; approve each one in the panel here", where)
+        return True
+
+    def _bind_remote_retry(self, s, stop):
+        delay, longest = BIND_RETRY
+        while not stop.wait(delay):
+            if self._bind_remote(s, stop):
+                return
+            delay = min(delay * 2, longest)
+
+    def _stop_remote(self):
+        stop = getattr(self, "remote_stop", None)
+        if stop:
+            stop.set()
+        with getattr(self, "remote_lock", threading.Lock()):
+            server, self.remote_server = getattr(self, "remote_server", None), None
+        if server:
+            server.stopping.set()
+            server.shutdown()
+            server.close_connections()   # keep-alive connections and event streams end now too
+            server.server_close()
+            self.hub.publish("ping")      # wakes its event streams so they notice
+            self.log.info("remote access: stopped listening on %s",
+                          f"[{server.listen}]:{server.port}" if ":" in server.listen else f"{server.listen}:{server.port}")
+
+    # ----- pairing (see core/remote_access.py)
+
+    def pair_start(self, ip, name):
+        """POST /api/pair/start from the device at `ip` (the remote listener checked it): announce
+        the request to the panels here and the desktop. Refused propagates."""
+        with self.pair_lock:
+            out = self.pairing.start(ip, name)
+            event = {"id": out["request"], "name": clean_name(name), "ip": normalize_ip(ip), "code": out["code"],
+                     "expires": out["expires"]}
+            self.announced[out["request"]] = out["expires"]
+            self.hub.publish("pair_request", event)
+        self.log.info("remote access: %r (%s) asks to use the control panel", event["name"], event["ip"])
+        code = event["code"]
+        shown = re.sub(r"[<>&]", "", event["name"]) or "A device"   # notification bodies may be markup
+        notify(f"{shown} wants to use the control panel. Code {code[:3]} {code[3:]}. Approve it in the panel.")
+        return out
+
+    def decide_pairing(self, body):
+        """POST /api/remote/decide {"request", "allow"} (this computer's panel only)."""
+        if request_context.remote_device() is not None:
+            raise ApiError(LOCAL_ONLY_MESSAGE, 403)
+        rid, allow = body.get("request"), body.get("allow")
+        if not isinstance(rid, str) or not rid:
+            raise ApiError("request is required")
+        if not isinstance(allow, bool):
+            raise ApiError("allow must be true or false")
+        with self.pair_lock:
+            asked = next((p for p in self.pairing.pending() if p["id"] == rid), None)
+            try:
+                self.pairing.decide(rid, allow, self.devices)
+            except Refused as e:
+                self._sweep_pairing()   # it may have just expired: say so now
+                raise ApiError(e.message, e.status) from None
+            except OSError as e:
+                raise ApiError(f"Couldn't save the approved device ({e.strerror or e}); try again", 500) from None
+            self.announced.pop(rid, None)
+            self.hub.publish("pair_done", {"id": rid, "allowed": allow})
+        self.log.info("remote access: %s %r (%s)", "approved" if allow else "denied",
+                      asked["name"] if asked else "?", asked["ip"] if asked else "?")
+        return {"ok": True}
+
+    def revoke_device(self, body):
+        """POST /api/remote/revoke {"device"} (this computer's panel only)."""
+        if request_context.remote_device() is not None:
+            raise ApiError(LOCAL_ONLY_MESSAGE, 403)
+        did = body.get("device")
+        if not isinstance(did, str) or not did:
+            raise ApiError("device is required")
+        known = next((d for d in self.devices.list() if d["id"] == did), None)
+        try:
+            found = self.devices.revoke(did)
+        except OSError as e:
+            self.hub.publish("ping")   # it is revoked for this run: end its event stream now
+            self.log.warning("remote access: revoked %r, but couldn't save that: %s", known and known["name"], e)
+            raise ApiError(f"The device is signed out, but that couldn't be saved ({e.strerror or e}), so it may "
+                           "come back after the daemon restarts", 500) from None
+        if not found:
+            raise ApiError("No such device", 404)
+        self.hub.publish("ping")   # wakes the event streams: the revoked device's own ends now
+        self.log.info("remote access: revoked %r (%s)", known["name"] if known else "?", known["ip"] if known else "?")
+        return {"ok": True}
+
+    def _sweep_pairing(self):
+        """pair_done (not allowed) for each announced request that expired unanswered. Lock held."""
+        live = {p["id"] for p in self.pairing.pending()}
+        for rid in [r for r in self.announced if r not in live]:
+            del self.announced[rid]
+            self.hub.publish("pair_done", {"id": rid, "allowed": False})
+
+    def _cancel_pairing(self):
+        """Remote access is off: deny every waiting request (pair_done, not allowed, for each)."""
+        if not hasattr(self, "pairing"):
+            return
+        with self.pair_lock:
+            waiting = self.pairing.pending()
+            for p in waiting:
+                try:
+                    self.pairing.decide(p["id"], False, self.devices)
+                except Refused:
+                    pass   # expired meanwhile
+            for rid in list(self.announced):
+                self.hub.publish("pair_done", {"id": rid, "allowed": False})
+            self.announced.clear()
+        if waiting:
+            self.log.info("remote access: off; cancelled %d waiting request%s", len(waiting), "" if len(waiting) == 1 else "s")
+
+    @task(every=PAIR_SWEEP_EVERY, on_page_change=False)
+    def expire_pairing(self):
+        """Requests that ran out of time unanswered: their pop-ups close in every panel here."""
+        if not getattr(self, "announced", None):
+            return
+        with self.pair_lock:
+            self._sweep_pairing()
+
+    def remote_seen(self, device, ip):
+        """A device's token was accepted: logged the first time each device uses it in this run."""
+        with self.remote_lock:
+            first = device["id"] not in self.devices_seen
+            self.devices_seen.add(device["id"])
+        if first:
+            self.log.info("remote access: %r is using the control panel (from %s)", device["name"], ip)
+
+    def remote_warn(self, ip, reason, fmt, *args):
+        """A refusal on the remote listener, logged at most once a minute per (address, reason);
+        `ip` is the peer's remote_access.peer_key, so an IPv6 /64 counts as one address."""
+        if self.warn_limit((ip, reason)):
+            self.log.warning(fmt, *args)
+
+    def remote_status(self):
+        """GET /api/status's "remote" part. A device sees no waiting requests, and which device it is.
+        (Before on_load, as in some tests: the settings, and nothing running.)"""
+        s = getattr(self, "remote", None) or self._remote_settings()
+        server, device = getattr(self, "remote_server", None), request_context.remote_device()
+        cache, devices, pairing = (getattr(self, name, None) for name in ("addresses", "devices", "pairing"))
+        snap = cache.get() if cache else None
+        local = list(snap.local) if snap else []
+        return {"enabled": s.enabled, "listen": s.listen, "port": s.port,
+                "urls": urls(server.listen, server.port, local, snap.hostname) if server and snap else [],
+                "addresses": local, "error": getattr(self, "remote_error", None),
+                "devices": devices.list() if devices else [],
+                "pending": pairing.pending() if pairing and not device else [],
+                "this_device": device["id"] if device else None}
+
     # ----- events for the panel
 
     @task(every=STATUS_EVERY, on_page_change=False)
     def push_status(self):
         """Every module's snapshot(), published as one "status" event when it changes."""
-        if not self.server or not self.hub.subscribers:
+        if not (self.server or getattr(self, "remote_server", None)) or not self.hub.subscribers:
             return
         snap = self.snapshot_all()
         if snap != self.last_status:
@@ -230,6 +530,8 @@ class Editor(Module):
         r.add_post("/api/run", self.run)
         r.add_post("/api/secret", self.secret)
         r.add_post("/api/session/revoke", self.revoke_sessions)
+        r.add_post("/api/remote/decide", self.decide_pairing)
+        r.add_post("/api/remote/revoke", self.revoke_device)
         r.add_post("/api/obs/build", self.build_obs)
         r.add_post("/api/client-error", self.client_error)
         r.add_post("/api/validate", lambda b: {"problems": self.validate(b.get("config") or {})})
@@ -257,10 +559,23 @@ class Editor(Module):
             self.log.warning("editor: can't open the control panel: %s", e)
 
     def revoke_sessions(self, body):
-        """Sign out every open panel: a new token, and unused links stop working."""
+        """Sign out every open panel: a new token, unused links stop working, and every approved
+        remote device is revoked (this computer's panel only)."""
+        if request_context.remote_device() is not None:
+            raise ApiError(LOCAL_ONLY_MESSAGE, 403)
         self.token = editor_auth.rotate()
+        failed = None
+        try:
+            self.devices.revoke_all()
+        except OSError as e:   # revoked in memory all the same
+            failed = e
         self.hub.publish("signed_out", {})   # wakes the event streams so they end now
         self.log.info("signed out all control panels")
+        if failed:
+            self.log.warning("remote access: signed out every device, but couldn't save that: %s", failed)
+            raise ApiError(f"Every panel is signed out, but the list of approved devices couldn't be saved "
+                           f"({failed.strerror or failed}), so they may come back after the daemon restarts", 500)
+        self.log.info("remote access: revoked every approved device")
         return {"ok": True}
 
     # ----- API
@@ -474,6 +789,7 @@ class Editor(Module):
         except Exception as e:
             self.log.warning("listing plugins for the panel failed: %s", e)
             st["plugins"] = []
+        st["remote"] = self.remote_status()
         return st
 
     def client_error(self, body):

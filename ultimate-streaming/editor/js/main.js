@@ -1,18 +1,21 @@
 /* Shell: navigation between views, status chips, theme, the event stream. Each view
    module exports mount(root) (called once, lazily) and optionally show()/hide(). */
-import { LAUNCH_ERROR, TOKEN, api, connect, forgetToken, on, onStreamState } from './api.js';
-import { $, $$, h, chip, icon, closeModal, modalOpen, toast } from './ui.js';
+import { LAUNCH_ERROR, REMOTE, TOKEN, api, connect, forgetToken, on, onStreamState } from './api.js';
+import { $, $$, h, chip, icon, closeModal, modalOpen, openModal, toast } from './ui.js';
+import { showPairing } from './pairing.js';
 import * as live from './live.js';
 import * as deck from './app.js';
 import * as twitch from './twitch.js';
 import * as bot from './twitchbot.js';
 import * as announce from './announce.js';
+import * as automod from './automod.js';
 import * as discord from './discord.js';
 import * as obs from './obs.js';
 import * as plugins from './plugins.js';
 import { maybeWelcome } from './backups.js';
+import { activeTab, groupOf, navView, renderTabs } from './tabs.js';
 
-const VIEWS = { live, deck, twitch, bot, announce, obs, discord, plugin: plugins, settings: deck.settings };
+const VIEWS = { live, deck, twitch, bot, announce, automod, obs, discord, plugin: plugins, settings: deck.settings };
 const mounted = new Set();
 let current = null;
 export let status = {};          // last /api/status (setup-level facts)
@@ -45,7 +48,7 @@ function initTheme() {
 
 /* ------------------------------------------------------------------ views */
 
-const ORDER = ['live', 'deck', 'twitch', 'bot', 'obs', 'settings'];
+const ORDER = ['live', 'deck', 'twitch', 'obs', 'settings'];
 
 export function viewName() { return new URLSearchParams(location.hash.slice(1)).get('view') || 'live'; }
 
@@ -59,9 +62,7 @@ async function showView(name) {
   const prev = current;
   current = name;
   markCurrent();
-  // a nested entry (Twitch Bot under Twitch) also marks its parent
-  const parent = ($(`.nav button[data-view="${name}"]`) || {}).dataset?.parent;
-  $$('.nav button').forEach((b) => b.classList.toggle('active-parent', b.dataset.view === parent));
+  renderTabs($('#section-tabs'), name);
   for (const v of Object.keys(VIEWS)) $(`#view-${v}`).hidden = v !== name;
   if (prev && prev !== name && VIEWS[prev].hide) VIEWS[prev].hide();
   const mod = VIEWS[name];
@@ -71,7 +72,15 @@ async function showView(name) {
   }
   if (mod.show) mod.show();
   showCurrentName();
-  if (name !== 'plugin') document.title = `${$(`.nav button[data-view="${name}"] .txt`).textContent} · Ultimate Streaming`;   // the plugin page sets its own
+  if (name !== 'plugin') document.title = pageTitle(name);   // the plugin page sets its own
+}
+
+/** "Bot · Twitch · Ultimate Streaming" inside a tab group, else "Live · Ultimate Streaming". */
+function pageTitle(name) {
+  const nav = $(`.nav button[data-view="${navView(name)}"] .txt`);
+  const section = nav ? nav.textContent : name;
+  const tab = groupOf(name) && activeTab(name);
+  return `${tab ? tab.label + ' · ' : ''}${section} · Ultimate Streaming`;
 }
 
 /* ------------------------------------------------------------------ plugin entries */
@@ -89,7 +98,7 @@ function showCurrentName() {
 function markCurrent() {
   const plug = pluginParam();
   $$('.nav button').forEach((b) => {
-    const on = b.dataset.view === current && (current !== 'plugin' || b.dataset.plugin === plug);
+    const on = b.dataset.view === navView(current) && (current !== 'plugin' || b.dataset.plugin === plug);
     b.setAttribute('aria-current', on ? 'page' : 'false');
   });
   showCurrentName();
@@ -120,12 +129,12 @@ function renderPluginNav() {
   markCurrent();
 }
 
-/** 1-6 jump between views, unless the user is typing or a dialog is open. */
+/** 1-5 jump between views, unless the user is typing or a dialog is open. */
 function onShortcut(e) {
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || modalOpen()) return;
   const el = document.activeElement;
   if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
-  const i = '123456'.indexOf(e.key);
+  const i = '12345'.indexOf(e.key);
   if (i < 0 || e.key.length !== 1) return;
   e.preventDefault();
   if (ORDER[i] !== current) go(ORDER[i]);
@@ -222,11 +231,125 @@ export async function refreshStatus() {
 
 const OPEN_HINT = 'Open the panel from your Stream Deck key or run `python3 main.py --open-editor` (or use “The Ultimate Streaming Control Panel for Linux” in your app menu).';
 
+/** Why this (local) panel has no sign-in. A remote panel without one shows pairing instead. */
+function noAccessText() {
+  return (LAUNCH_ERROR ? LAUNCH_ERROR + '. ' : '') + OPEN_HINT;
+}
+
 function fatal(text) {
   const f = $('#fatal');
   f.hidden = false;
   f.replaceChildren(h('strong', { text: 'Can’t open the control panel. ' }), h('span', { text }));
   $$('main > section').forEach((s) => { s.hidden = true; });
+  $('#section-tabs').hidden = true;
+}
+
+/* A tokenless panel on another device: replace the app with the pairing screen. */
+function pairingScreen() {
+  document.body.classList.add('is-pairing');   // pairing.css hides the nav and status bar: nothing works until approved
+  $$('main > section').forEach((s) => { s.hidden = true; });
+  $('#fatal').hidden = true;
+  let box = $('#pairing');
+  if (!box) { box = h('div', { id: 'pairing' }); $('main').append(box); }
+  showPairing(box);
+}
+
+/* ------------------------------------------------------------------ approving a new device (local panel only) */
+
+/* pairQueue holds every request still waiting (oldest first), whether or not it has been shown.
+   Closing the prompt (Escape, X, backdrop) only marks its requests "seen": they stay in the queue
+   and in Settings → Access, but don't pop up again. Requests from one address collapse into the
+   newest one (the others are mentioned, and denied together with it). */
+const pairQueue = [];        // {id, name, ip, code, expires}
+const pairSeen = new Set();  // ids whose prompt was closed without a decision
+const pairExpiry = new Map();   // id -> timer that drops the request when it runs out
+let pairShown = null;        // {ids: every id the open prompt stands for}, or null
+let pairRetry = null;
+
+const sameAddr = (a, b) => (a.ip || '') === (b.ip || '');
+
+/** Forget a request. Closes the prompt only if it is ours: pairShown is cleared whenever any other
+    dialog opens, so it can never point at someone else's modal. */
+function pairDrop(id) {
+  const i = pairQueue.findIndex((q) => q.id === id);
+  if (i >= 0) pairQueue.splice(i, 1);
+  clearTimeout(pairExpiry.get(id)); pairExpiry.delete(id);
+  pairSeen.delete(id);
+  pairRefresh();
+}
+
+/** The queue changed: close our open prompt (not marking anything seen) so pairNext redraws it with
+    the current counts. pairShown is cleared whenever any other dialog opens, so this never closes someone else's. */
+function pairRefresh() { if (pairShown) { pairShown = null; closeModal(); } }
+
+function pairRemove(id) { pairDrop(id); pairNext(); }
+
+function pairAdd(r) {
+  if (!r || typeof r.id !== 'string' || pairQueue.some((q) => q.id === r.id)) return false;
+  const left = Number(r.expires) * 1000 - Date.now();
+  if (!(left > 0)) return false;
+  pairQueue.push(r);
+  pairRefresh();
+  pairExpiry.set(r.id, setTimeout(() => pairRemove(r.id), left));
+  return true;
+}
+
+/** Add what the daemon says is waiting (requests made while this panel was closed or offline).
+    `prune`: also forget queued requests the daemon no longer lists (decided while we were away). */
+function pairSeed(prune) {
+  const list = status && status.remote && Array.isArray(status.remote.pending) ? status.remote.pending : null;
+  if (!list) return;
+  if (prune) for (const q of [...pairQueue]) if (!list.some((p) => p.id === q.id)) pairDrop(q.id);
+  for (const r of list) pairAdd(r);
+  pairNext();
+}
+
+async function pairDecide(pairs) {   // pairs: [[request, allow], ...]
+  for (const [r] of pairs) pairDrop(r.id);
+  const res = await Promise.allSettled(pairs.map(([r, allow]) => api('/api/remote/decide', { request: r.id, allow })));
+  const bad = res.filter((x) => x.status === 'rejected');
+  const [first, allow] = pairs[0];
+  const what = pairs.length > 1 && !allow && pairs.every((p) => !p[1]) ? `${pairs.length} requests` : first.name;
+  if (bad.length) toast(`Could not ${allow ? 'allow' : 'deny'} ${what}: ${bad[0].reason.message}`, { bad: true });
+  else toast(`${allow ? 'Allowed' : 'Denied'} ${what}`);
+  refreshStatus();
+  pairNext();
+}
+
+function pairNext() {
+  clearTimeout(pairRetry); pairRetry = null;
+  if (pairShown) return;
+  const head = pairQueue.find((q) => !pairSeen.has(q.id));
+  if (!head) return;
+  if (modalOpen()) { pairRetry = setTimeout(pairNext, 1000); return; }   // never replace another dialog
+  const group = pairQueue.filter((q) => sameAddr(q, head));
+  const r = group[group.length - 1];             // newest from this address
+  const earlier = group.slice(0, -1);
+  const mine = { ids: group.map((q) => q.id) };
+  pairShown = mine;
+  const digits = String(r.code);
+  const decideShown = (allow) => pairDecide([[r, allow], ...earlier.map((q) => [q, false])]);
+  openModal('Allow a new device?', h('div', { class: 'pair-ask' },
+    h('p', { class: 'pair-device' }, h('strong', { text: r.ip || 'Unknown address' }),
+      h('span', { class: 'muted' }, ' · calls itself “', r.name || 'Unknown device', '”')),
+    earlier.length ? h('p', { class: 'pair-more', text: `${earlier.length} earlier request${earlier.length > 1 ? 's' : ''} from this address` }) : null,
+    h('p', { class: 'pair-codelabel', text: 'Check this code matches the one on that device' }),
+    h('div', { class: 'pair-code', role: 'img', 'aria-label': 'Code: ' + digits.split('').join(' ') },
+      `${digits.slice(0, 3)} ${digits.slice(3)}`),
+    h('p', { class: 'note warn', text: 'It will be able to control this panel: run commands, OBS and your Twitch channel.' }),
+    h('div', { class: 'row end pair-actions' },
+      pairQueue.length > 1 ? h('button', { class: 'ghost', text: `Deny all waiting (${pairQueue.length})`,
+        onclick: () => pairDecide(pairQueue.map((q) => [q, false])) }) : null,
+      h('button', { class: 'ghost', text: 'Deny', onclick: () => decideShown(false) }),
+      h('button', { class: 'primary', text: 'Allow', onclick: () => decideShown(true) })),
+    h('p', { class: 'pair-later', text: 'Closing this keeps the request in Settings → Access.' })),
+  { onClose: () => {   // Escape, X, backdrop, or another dialog taking over: seen, not decided
+    if (pairShown !== mine) return;
+    pairShown = null;
+    for (const id of mine.ids) pairSeen.add(id);
+    pairNext();
+  } });
+  $('#modal-close').focus();   // Allow is never the default focus
 }
 
 /* Uncaught errors go to the daemon's log (visible in tools/devserver.py output and
@@ -238,17 +361,20 @@ function reportError(message, stack) {
 window.addEventListener('error', (e) => reportError(e.message, e.error && e.error.stack));
 window.addEventListener('unhandledrejection', (e) => reportError(e.reason && e.reason.message || e.reason, e.reason && e.reason.stack));
 
+let started = false;   // boot finished: the first status is in
+
 async function main() {
   initTheme();
+  $('#remote-chip').hidden = !REMOTE;
   $$('.nav button').forEach((b) => b.addEventListener('click', () => go(b.dataset.view)));
   $('#fallback-link').addEventListener('click', () => {
-    go('settings');
+    go('settings', { tab: 'backups' });
     setTimeout(() => { const c = $('#backups-card'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 250);
   });
   // "Sign out all panels" (Settings): this panel is signed out too, so show what a tokenless panel shows
   document.addEventListener('deck:signedout', () => {
     forgetToken();
-    fatal(OPEN_HINT);
+    if (REMOTE) pairingScreen(); else fatal(OPEN_HINT);
   });
   $('#modal-close').addEventListener('click', closeModal);
   $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
@@ -257,7 +383,7 @@ async function main() {
   window.addEventListener('hashchange', () => showView(viewName()));
 
   if (!TOKEN) {
-    fatal((LAUNCH_ERROR ? LAUNCH_ERROR + '. ' : '') + OPEN_HINT);
+    if (REMOTE) pairingScreen(); else fatal(noAccessText());
     return;
   }
   try { await api('/api/status'); } catch (e) {
@@ -272,7 +398,19 @@ async function main() {
     status = { ...status, decks: d.decks, deck: d.decks[0] || null };   // the primary comes first
     renderChips();
   });
-  onStreamState(onStream);
+  if (!REMOTE) {
+    on('pair_request', (r) => {
+      if (pairAdd(r)) pairNext();
+      refreshStatus();
+    });
+    on('pair_done', (d) => { if (d) pairRemove(d.id); refreshStatus(); });
+  }
+  let wasUp = false;
+  onStreamState((s) => {
+    onStream(s);
+    if (s.connected && !wasUp && !REMOTE && started) refreshStatus().then(() => pairSeed(true));   // reconnected: catch up on what we missed
+    wasUp = !!s.connected;
+  });
   // Data arriving proves the stream is up: never leave a stale "Reconnecting…" banner showing.
   on('*', () => {
     const banner = $('#conn-banner');
@@ -280,6 +418,8 @@ async function main() {
   });
   connect();
   await refreshStatus();
+  started = true;
+  if (!REMOTE) pairSeed(true);
   setInterval(refreshStatus, 15000);
   await showView(viewName());
   maybeWelcome().catch(() => {});

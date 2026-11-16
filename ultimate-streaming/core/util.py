@@ -14,7 +14,7 @@ log = logging.getLogger("deck")
 # The app's own credentials and state, which a config's `*_file:` must never point read_secret() at
 # (it would hand e.g. the Twitch tokens to whatever URL that module talks to).
 OWN_SECRETS = ("twitch.json", "editor_token", "discord_webhooks.json", "discord_state.json", "alerts.json",
-               "announce_state.json", "chatstats.db")
+               "announce_state.json", "chatstats.db", "remote_devices.json")
 OWN_SECRET_DIRS = ("launch",)
 
 

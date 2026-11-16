@@ -94,6 +94,17 @@ start_page: main
 # device: {serial: "XXXXXXXXXXXX"}          # optional: drive ONLY this deck (or {model: "Stream Deck XL"})
 
 # editor: {port: 8765}                      # web editor (127.0.0.1 only); enabled: false turns it off
+# Let other devices (phone, laptop) use the panel (also Settings → Access → Remote access).
+# Each device is approved on this computer first. Plain HTTP: use a trusted network or a VPN.
+# An approved device can run commands. "0.0.0.0" also exposes the port on other networks this
+# computer joins; set one address to limit it. Change these only on this computer.
+# editor:
+#   remote:
+#     enabled: false        # let other devices (phone, laptop) use the panel; each one approved here first
+#     listen: "0.0.0.0"     # "0.0.0.0" = every IPv4 address, "::" = IPv4 and IPv6, or one address of this computer
+#     port: 8767            # remote devices use this port; the panel on this computer stays on editor.port
+#     hosts: []             # extra names you type in the address bar, e.g. ["streampc.lan"]
+#     device_days: 30       # an approved device stays signed in this long (1-365)
 
 # font: "DejaVu Sans:bold"                  # fontconfig name or a .ttf path
 # emoji_font: "Noto Color Emoji"
@@ -219,6 +230,22 @@ twitch:
 #       message: "{channel} is live! {title}\n{url}"   # up to 1500 characters; Discord markdown works
 #       embed: true                   # add a card with the title, game, link and stream preview
 #       ping: none                    # none, everyone, here or role:<role id>
+
+# ── Auto-mod ─────────────────────────────────────────────────────────────────
+# Bans, times out or deletes chat messages that contain a keyword. Twitch → Moderation in the
+# control panel edits this, shows what was caught and can undo a ban. A caught message never
+# reaches the BRB chat feed, the panel's chat or the Twitch Bot. Banning needs Twitch linked;
+# the broadcaster and moderators are never actioned. See README → Auto-mod.
+# automod:
+#   enabled: true
+#   exempt: vip                       # subscriber, vip or moderator: that level and up is never actioned
+#   terms:                            # up to 200
+#     - {term: streamboo, action: ban}                # viewer-bot spam ("Best viewers on streamboo .com")
+#     - {term: "buy followers", action: timeout, seconds: 600}
+#     - {term: spoiler, action: delete}
+#     # match: word (the default) ignores case, spacing, punctuation and lookalike letters, but
+#     # needs word boundaries: "streamboo" catches "s t r e a m b o o" and "STREAMB00", not
+#     # "stream boost". match: anywhere also matches inside other words.
 
 # ── Twitch alerts ────────────────────────────────────────────────────────────
 # On-stream alerts for follows, subs, resubs, gifted subs, cheers and raids: text in

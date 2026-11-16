@@ -5,6 +5,7 @@ Other modules receive messages with:
     def on_chat(self, msg): ...       # msg: {"id", "user", "login", "user_id", "text", "action", "color", "mod", "sub", "badges"}
 
 The channel comes from `twitch: channel:` in config.yaml (or `chat: channel:`).
+A message the auto-mod catches (modules/automod.py) is never broadcast.
 """
 import random
 import re
@@ -157,12 +158,25 @@ class Chat(Module):
                 if name in BADGES and name not in badges:
                     badges.append(name)
             color = tags.get("color") or ""
-            self.bot.dispatch("chat_message", {
-                "id": tags.get("id") or "", "user": user, "login": login, "user_id": user_id,
-                "text": text, "action": is_action,
-                "color": color if COLOR_RE.fullmatch(color) else "",
-                "mod": "moderator" in badges or "broadcaster" in badges, "sub": "subscriber" in badges,
-                "badges": badges})
+            msg = {"id": tags.get("id") or "", "user": user, "login": login, "user_id": user_id,
+                   "text": text, "action": is_action,
+                   "color": color if COLOR_RE.fullmatch(color) else "",
+                   "mod": "moderator" in badges or "broadcaster" in badges, "sub": "subscriber" in badges,
+                   "badges": badges}
+            if self._caught(msg):
+                return
+            self.bot.dispatch("chat_message", msg)
+
+    def _caught(self, msg):
+        """True if the auto-mod caught `msg`: then nothing else sees it (overlay, panel, bot)."""
+        automod = self.bot.get_module("AutoMod")
+        if automod is None:
+            return False
+        try:
+            return automod.screen(msg) is True
+        except Exception:
+            self.log.exception("auto-mod check failed; the message is shown")
+            return False
 
     def snapshot(self):
         return {"connected": bool(self.connected), "channel": self.channel or ""}
