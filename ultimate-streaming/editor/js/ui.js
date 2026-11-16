@@ -143,8 +143,12 @@ export function toast(msg, opts = {}) {
 /* ------------------------------------------------------------------ modal (with focus trap) */
 
 let lastFocus = null;
-export function openModal(title, body, { wide } = {}) {
-  lastFocus = document.activeElement;
+let closeHook = null;   // onClose of the dialog that is open; runs once, however it closes
+export function openModal(title, body, { wide, onClose } = {}) {
+  const prev = closeHook; closeHook = null;
+  if (prev) prev();   // a dialog replaced by another counts as closed
+  if (!modalOpen()) lastFocus = document.activeElement;
+  closeHook = onClose || null;
   $('#modal-title').textContent = title;
   $('#modal-body').replaceChildren(body);
   $('#modal .modal-box').classList.toggle('wide', !!wide);
@@ -153,8 +157,10 @@ export function openModal(title, body, { wide } = {}) {
   (first || $('#modal-close')).focus();
 }
 export function closeModal() {
+  const hook = closeHook; closeHook = null;
   $('#modal').hidden = true;
   if (lastFocus && lastFocus.focus) lastFocus.focus();
+  if (hook) hook();
 }
 export function modalOpen() { return !$('#modal').hidden; }
 

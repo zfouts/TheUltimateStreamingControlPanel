@@ -13,6 +13,7 @@ import re
 
 import yaml
 
+from . import request_context
 from .paths import state_dir
 from .safefs import write_atomic  # noqa: F401  (re-exported: backups, discord and announce call it here)
 
@@ -212,15 +213,59 @@ class Conflict(Exception):
     """The file changed on disk since the editor loaded it."""
 
 
+def _kind(v):
+    if isinstance(v, bool):
+        return bool
+    for t in (int, float, str, dict, list, tuple):
+        if isinstance(v, t):
+            return list if t is tuple else t
+    return type(v)
+
+
+def _same(a, b):
+    """Equal and of the same kinds all the way down (True is not 1, 8767 is not 8767.0)."""
+    if _kind(a) is not _kind(b):
+        return False
+    if isinstance(a, dict):
+        return a.keys() == b.keys() and all(_same(a[k], b[k]) for k in a)
+    if isinstance(a, (list, tuple)):
+        return len(a) == len(b) and all(_same(x, y) for x, y in zip(a, b))
+    return a == b
+
+
+def _editor_section(cfg):
+    section = cfg.get("editor") if isinstance(cfg, dict) else None
+    return {} if section is None else section
+
+
+def refuse_remote_editor_change(path, cfg):
+    """During a request from another device (core.request_context), raise RemoteRefused (403)
+    unless cfg's `editor` section is exactly the one in the file at `path`. Missing and empty
+    count as the same; a file that can't be read can't be compared, so it refuses."""
+    if request_context.remote_device() is None:
+        return
+    try:
+        current = load(path)
+    except FileNotFoundError:
+        current = {}
+    except (OSError, yaml.YAMLError, ValueError):
+        raise request_context.RemoteRefused("config.yaml can't be read, so it can only be fixed on the "
+                                            "streaming computer") from None
+    if not _same(_editor_section(current), _editor_section(cfg)):
+        raise request_context.RemoteRefused()
+
+
 def save(path, cfg, base_hash=None, source="panel"):
     """Record the current file as a revision, then atomically write cfg and record that too
-    (`source` says who saved: see backups.SOURCES). Returns the new file's hash."""
+    (`source` says who saved: see backups.SOURCES). Returns the new file's hash. From another
+    device (core.request_context) a change to the `editor` section is refused (RemoteRefused, 403)."""
     from . import backups  # backups uses write_atomic; import here to avoid a cycle
     text = dumps(cfg)
     safe_load_bounded(text)  # never write something we can't read back
     with backups.LOCK:
         if base_hash is not None and file_hash(path) != base_hash:
             raise Conflict("config.yaml was changed by someone else since the editor loaded it")
+        refuse_remote_editor_change(path, cfg)
         if os.path.exists(path):
             backups.record(path, "before-save")  # if this fails, don't overwrite the file
         write_atomic(path, text.encode("utf-8"), follow_symlink=True)

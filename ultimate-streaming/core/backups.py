@@ -280,6 +280,7 @@ def _restore_bytes(data, path, label):
     if not isinstance(cfg, dict) or not (cfg.get("pages") or cfg.get("layouts")):
         raise ValueError("that backup has no pages or layouts, so it can't be restored")
     with LOCK:
+        configio.refuse_remote_editor_change(path, cfg)   # from another device: never a new `editor` section
         record(path, "before-save")  # so the restore can be undone; if this fails, don't overwrite
         configio.write_atomic(path, data, follow_symlink=True)
         record(path, "restore", label=label)
@@ -287,7 +288,9 @@ def _restore_bytes(data, path, label):
 
 
 def restore(rid, path):
-    """Put a revision's exact bytes back as config.yaml. Returns the new file hash."""
+    """Put a revision's exact bytes back as config.yaml. Returns the new file hash. From another
+    device (core.request_context), a revision whose `editor` section differs from the current
+    file's is refused (RemoteRefused, 403), as by restore_daily."""
     return _restore_bytes(_read_rev(rid), path, f"Restored {rid}")
 
 

@@ -343,7 +343,8 @@ class ReadSecret(unittest.TestCase):
         return path
 
     def test_own_secret_files_refused(self):
-        for name in ("twitch.json", "editor_token", "discord_webhooks.json", "alerts.json", "announce_state.json"):
+        for name in ("twitch.json", "editor_token", "discord_webhooks.json", "alerts.json", "announce_state.json",
+                     "remote_devices.json"):
             path = self.own(name) if name != "editor_token" else os.path.join(STATE, name)
             with self.subTest(name), self.assertLogs("deck", logging.WARNING):
                 self.assertIsNone(util.read_secret("NO_SUCH_ENV_VAR", path))

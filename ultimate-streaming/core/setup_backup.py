@@ -31,6 +31,7 @@ import time
 import zlib
 from pathlib import PurePosixPath
 
+from . import request_context
 from .safefs import NotRegular, TooBig, inside, read_regular, state_home, walk_regular
 
 log = logging.getLogger("deck")
@@ -880,7 +881,9 @@ def restore(archive_id, kind, *, roots, is_running, confirm=False, allow_other_t
     with the app confirmed stopped, the current files are backed up (pre_backup) and the staged
     files renamed into place. A failure part-way puts the previous files back. Files in the
     target that the archive doesn't have are left alone. An archive that recorded a different
-    source folder is refused (RestoreTargetMismatch) unless allow_other_target is True."""
+    source folder is refused (RestoreTargetMismatch) unless allow_other_target is True. Never from
+    another device (core.request_context: RemoteRefused, 403)."""
+    request_context.refuse_remote()
     if confirm is not True:
         raise ValueError("restore needs confirm=True")
     _check_id(archive_id)

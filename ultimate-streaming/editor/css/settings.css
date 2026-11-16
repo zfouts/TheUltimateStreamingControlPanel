@@ -1,0 +1,28 @@
+/* Settings view (app.js renderSettings): one tab panel at a time, plus the Remote access card.
+   Supersedes the old .settings / .settings-aside / .settings-main grid in style.css. */
+/* same 1240px box as the tab strip above it, so the page lines up with the tabs */
+.settings { display: block; max-width: 1240px; margin: 0 auto; }
+.settings > .page-head { margin-bottom: var(--s-5); }
+.settings-panel { display: flex; flex-direction: column; gap: var(--s-5); min-width: 0; max-width: 880px; }
+.settings-panel.settings-general { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; max-width: none; }
+.settings-aside, .settings-main { display: flex; flex-direction: column; gap: var(--s-5); min-width: 0; }
+@media (max-width: 1180px) {
+  .settings-panel.settings-general { grid-template-columns: minmax(0, 1fr); }
+}
+
+.ra-switch { margin-bottom: var(--s-4); }
+.ra-status { display: flex; flex-direction: column; gap: var(--s-3); margin: var(--s-4) 0; padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r); background: var(--panel-2); }
+.ra-status > :first-child { margin-top: 0; }
+.ra-status p, .ra-status .subhead { margin: 0; }
+.ra-label { font-size: var(--fs-sm); color: var(--muted); margin-bottom: var(--s-1); }
+.ra-url { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.ra-url a { overflow-wrap: anywhere; }
+.ra-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+.ra-list li { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; font-size: var(--fs-sm); }
+.ra-main { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ra-who { font-weight: 600; overflow-wrap: anywhere; display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.ra-meta { color: var(--muted); overflow-wrap: anywhere; }
+.ra-code { font-family: var(--mono); font-size: var(--fs-lg, 1.25rem); font-weight: 700; letter-spacing: .12em; white-space: nowrap; }
+.ra-actions { display: flex; gap: var(--s-2); flex: none; }
+.ra-status + .note, .ra-status + .hint { margin-top: 0; }
+.ra-status + .note { margin-bottom: var(--s-2); }

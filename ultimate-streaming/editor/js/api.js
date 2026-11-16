@@ -4,18 +4,38 @@
    the access token: on load it is traded for the token (POST /api/session), stripped from the
    URL, and the token is kept in sessionStorage. The token travels only in the X-Deck-Token
    header (also for the event stream, which is read with fetch() for that reason). An old
-   #token=... link is only cleared from the address bar, never used. */
+   #token=... link is only cleared from the address bar, never used.
+
+   A panel opened from another device (the daemon's remote listener, see editor.remote) has no
+   launch code: it asks for access (pairing.js), someone approves it on the streaming computer,
+   and it gets a device token of its own, kept in localStorage so the device stays signed in
+   until that token expires or is revoked. */
 
 /** Why there is no token, if a launch code was refused ('' otherwise). */
 export let LAUNCH_ERROR = '';
 
+/** True when this page was opened from another device (the daemon's remote listener), not on
+    the computer the daemon runs on. Such a panel pairs instead of using launch codes. */
+export const REMOTE = !['127.0.0.1', 'localhost', '[::1]', '::1'].includes(location.hostname);
+const DEVICE_KEY = 'deck_device_token';
+
 function stored() {
-  try { return sessionStorage.getItem('deck_token') || ''; } catch (e) { return ''; }
+  try {
+    return (REMOTE ? localStorage.getItem(DEVICE_KEY) : sessionStorage.getItem('deck_token')) || '';
+  } catch (e) { return ''; }
+}
+
+/** Keep a remote device's token (from pairing.js once it is approved). */
+export function storeDeviceToken(token) {
+  try { localStorage.setItem(DEVICE_KEY, token); } catch (e) { /* storage off: pairing can't stick */ }
 }
 
 /** Forget the stored token (it was rejected), so a reload doesn't reuse it. */
 export function forgetToken() {
-  try { sessionStorage.removeItem('deck_token'); } catch (e) { /* storage off */ }
+  try {
+    if (REMOTE) localStorage.removeItem(DEVICE_KEY);
+    else sessionStorage.removeItem('deck_token');
+  } catch (e) { /* storage off */ }
 }
 
 async function takeToken() {
@@ -27,7 +47,7 @@ async function takeToken() {
     const rest = params.toString();
     history.replaceState(null, '', location.pathname + (rest ? '#' + rest : ''));
   }
-  if (!code) return stored();
+  if (!code || REMOTE) return stored();   // a remote panel pairs instead (pairing.js)
   try {
     const r = await fetch('/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
     let data = {};
@@ -61,8 +81,16 @@ export async function api(path, body) {
   try { r = await fetch(path, opts); } catch (e) { throw new ApiError('The daemon isn’t reachable', 0); }
   let data = {};
   try { data = await r.json(); } catch (e) { /* no body */ }
+  if (r.status === 401 && REMOTE && TOKEN) remoteSignedOut();
   if (!r.ok) throw new ApiError(data.error || r.statusText, r.status, data.mismatch ? { mismatch: data.mismatch } : undefined);
   return data;
+}
+
+/** A remote device's token stopped working (expired, revoked, or remote access turned off):
+    forget it and reload, which shows the pairing screen. Only once per token, so no loop. */
+function remoteSignedOut() {
+  forgetToken();
+  location.reload();
 }
 
 /** POST a file as a raw application/octet-stream body (uploads). Same errors as api(). */

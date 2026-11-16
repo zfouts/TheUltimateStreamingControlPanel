@@ -32,7 +32,7 @@ Screen, Game, Camera, an interactive BRB screen, Ending) for the deck to control
 4. [Set up OBS](#set-up-obs)
 5. [Link Twitch](#link-twitch)
 6. [BRB media](#brb-media)
-7. [The control panel](#the-control-panel): views, backups, import, security
+7. [The control panel](#the-control-panel): views, backups, import, security, [using it from another device](#using-the-panel-from-another-device)
 8. [Twitch Bot](#twitch-bot): timers, commands, rewards, chat stats
 9. [Discord webhooks](#discord-webhooks): the Discord channels your features post to
 10. [Go-live announcements](#go-live-announcements): post to Discord when you go live
@@ -133,7 +133,7 @@ an older version in `~/.config/streamdeck` are moved over, with a link left at t
 If you already use OBS or another Stream Deck program, the **Bring your existing setup**
 assistant brings them over. It opens on its own the first time you open the panel on a fresh
 install, if it finds an OBS profile besides "Untitled" or another deck program. Otherwise,
-open it from **Settings → Existing setup → Open the setup assistant**. Its four steps are
+open it from **Settings → General → Existing setup → Open the setup assistant**. Its four steps are
 **We found → Back up → Bring it over → Deck access**, and nothing changes until you choose to.
 
 **We found** lists what it found in these places (**Scan again** looks again):
@@ -171,7 +171,7 @@ your stream key, so don't share them or copy them anywhere synced. They're kept 
 
 ### Restoring a backup
 
-To restore, open **Settings → External backups** and press **Restore** next to the part you
+To restore, open **Settings → Backups → External backups** and press **Restore** next to the part you
 want (OBS, or one program).
 1. **Close OBS, or that program, first.** A restore refuses to run while it's open.
 2. Confirm. The settings it replaces are backed up first (a pre-restore backup), so you can
@@ -203,7 +203,7 @@ brightness and delays.
   (`back_2`).
 - **Several decks** merge into your layouts by key grid (`8x4`, `3x2`, …). A second deck with
   the same grid gets its own layout (`8x4-2`) and, when the source knows its serial, a
-  `devices:` entry so that deck shows it. Otherwise, pick the layout in Settings → Decks.
+  `devices:` entry so that deck shows it. Otherwise, pick the layout in Settings → General → Decks.
 - **Keys with several states** come in with one state: the first one (Elgato: the one saved
   in the profile).
 - **Dials and touch screens** aren't imported.
@@ -280,7 +280,7 @@ an action, then press **Done, hide this note**.
 ## Set up OBS
 
 Open the control panel from your applications menu (or `python3 main.py --open-editor`) and
-go to **Settings**. Its checklist covers these steps and has buttons for the ones that can
+go to **Settings → General**. Its setup checklist covers these steps and has buttons for the ones that can
 be automated. To do them by hand:
 
 1. Start OBS, open **Tools → WebSocket Server Settings** and check **Enable WebSocket server**.
@@ -397,7 +397,8 @@ the [Twitch Bot](#twitch-bot) when it's on.
 
 To open the panel, use the applications menu entry, run `python3 main.py --open-editor`, or
 press a deck key with `action: {editor: open}`. It runs at `http://127.0.0.1:8765` and
-updates live. `1`–`6` switch views when you're not typing in a field.
+updates live. `1`–`5` switch views when you're not typing in a field. To open it from your phone or
+another computer, see [Using the panel from another device](#using-the-panel-from-another-device).
 
 Each link carries a launch code that works once, within a minute, and only for the browser of
 the user running the daemon; the page trades it for the panel's access token, which never
@@ -412,10 +413,13 @@ panel.
 |---|---|
 | Live (`1`) | press keys on a mirror of each deck, switch pages, set brightness; go live, record, replay, virtual camera; scenes and mutes; chat feed, BRB games, hype meter, countdowns; activity log |
 | Deck (`2`) | edit keys, pages, layouts, dials and the Neo's touch keys (below) |
-| Twitch (`3`) | setup until you're linked; then title, category and tags (or a recent setup), chat with moderation, shoutouts and announcements, chat modes, ads, markers, clips, raids |
-| Twitch Bot (`4`) | timers, commands, rewards and chat stats; see [Twitch Bot](#twitch-bot) |
-| OBS (`5`) | outputs and screenshots, scenes with studio mode, audio mixer, performance stats, a raw WebSocket request console |
-| Settings (`6`) | setup checklist, BRB polls and games, deck options, **Decks** (see [Several decks](#several-decks)), Home Assistant, remote OBS password, backups, import, **Existing setup** and **External backups** (see [Coming from another setup](#coming-from-another-setup)); **Discord** under it holds your [Discord webhooks](#discord-webhooks) |
+| Twitch (`3`) | tabs **Channel**, **Bot** and **Announcements**. Channel: setup until you're linked; then title, category and tags (or a recent setup), chat with moderation, shoutouts, chat modes, ads, markers, clips, raids. Bot: timers, commands, rewards and chat stats; see [Twitch Bot](#twitch-bot). Announcements: see [Go-live announcements](#go-live-announcements) |
+| OBS (`4`) | outputs and screenshots, scenes with studio mode, audio mixer, performance stats, a raw WebSocket request console |
+| Settings (`5`) | tabs **General**, **OBS**, **BRB & radio**, **Home Assistant**, **Access**, **Backups** and **Discord**. **General** has the setup checklist, **Existing setup** (see [Coming from another setup](#coming-from-another-setup)), the Twitch link card, **Decks** (see [Several decks](#several-decks)) and deck options (brightness, deck serial, editor port). **OBS** has OBS scenes and OBS on another computer. **BRB & radio** has the BRB screen, chat polls and the radio folder. **Access** has **Sign out all panels** and [Remote access](#using-the-panel-from-another-device). **Backups** has backups and history, **Import a setup…** and **External backups**. **Discord** holds your [Discord webhooks](#discord-webhooks) |
+
+The sidebar has one entry per view. Within **Twitch** and **Settings**, the tabs along the top
+switch pages without leaving the view. Each tab has its own address, so you can bookmark it:
+`#view=bot` is the Twitch view's **Bot** tab, `#view=settings&tab=obs` is Settings → **OBS**.
 
 ### Editing keys
 
@@ -432,7 +436,7 @@ wrote your own, the editor warns you before the first save.
 
 ### Backups and history
 
-To roll back, open Settings → **Backups & history**: **View changes** shows a revision's diff
+To roll back, open Settings → Backups → **Backups & history**: **View changes** shows a revision's diff
 against your config, **Restore** puts it back (and can itself be undone), and **Snapshot now**
 bookmarks the current config under a name.
 - **Revisions** of `config.yaml` (panel saves, hand edits, imports, restores, snapshots) are
@@ -442,7 +446,7 @@ bookmarks the current config under a name.
 
 ### Importing an existing setup
 
-To bring in another deck config, open Settings → **Import a setup…** (a fresh install offers
+To bring in another deck config, open Settings → Backups → **Import a setup…** (a fresh install offers
 it when it finds one). Pick a config it found or a file, then review what will be **added**
 and each **conflict** side by side (**Keep mine** unless you switch it). A restore point is
 saved first, and the last step has **Undo import**. On a fresh install the import replaces
@@ -452,15 +456,97 @@ the example pages.
 
 Anyone with the panel's link can do anything your deck can, including running its shell
 commands and controlling OBS and your Twitch channel. Don't share the link or paste it
-anywhere. The panel listens on 127.0.0.1 only.
+anywhere. By default the panel listens on 127.0.0.1 only. You can also let your own devices
+reach it, each one approved on this computer first (see [below](#using-the-panel-from-another-device)); that is
+off until you turn it on.
 - To sign out every open panel, send `POST /api/session/revoke` (with the panel's token) or
   restart the daemon: `systemctl --user restart ultimate-streaming`. Either gives the panel a new
   access token.
 - Don't show the Twitch view while linking (the code is a login) or the OBS request console
   (it can show stream keys) on stream.
 - To turn the panel off, set `editor: {enabled: false}`; to change the port, `editor: {port: 9876}`.
+- Remote devices follow different rules: see "What is checked" [below](#using-the-panel-from-another-device). That listener is plain HTTP, so use it on a trusted network or over a VPN.
 - A [plugin](#plugins) runs with the same rights as the app and can read your tokens. Install
   only plugins you trust.
+
+### Using the panel from another device
+
+You can open the panel from your phone, laptop or tablet on the same network. It is off by
+default. Each device has to be approved on this computer before it gets in.
+
+**Set it up**
+
+1. In the panel on this computer, open **Settings → Access → Remote access**, turn it on and
+   **Save**. Or set it in `config.yaml`:
+
+   ```yaml
+   editor:
+     remote:
+       enabled: true
+       listen: "0.0.0.0"     # "0.0.0.0" = every IPv4 address, "::" = IPv4 and IPv6, or one address of this computer
+       port: 8767            # remote devices use this port; the panel on this computer stays on editor.port
+       hosts: []             # extra names you type in the address bar, e.g. ["streampc.lan"]
+       device_days: 30       # an approved device stays signed in this long (1-365)
+   ```
+
+2. If you run a firewall, open the remote port (8767 unless you changed `port`).
+3. Open the address the **Remote access** card shows, on the other device. It looks like
+   `http://<hostname>.local:8767`. The card lists the exact URLs.
+
+You can change these settings only on this computer. A remote panel shows them read-only, and the
+daemon refuses remote changes to the `editor` section, including through backup restores and imports.
+
+Remote access adds a second listener. The `127.0.0.1` listener and its launch-code sign-in work
+as before. The new listener refuses connections from this computer itself (loopback).
+
+**Pair a device**
+
+1. On the other device, open `http://<computer>:8767` and tap **Ask for access**. It shows a
+   6-digit code.
+2. The panel on this computer pops up the same code with **Allow** and **Deny**. The request also
+   appears under **Settings → Access**, with a desktop notification.
+3. Check that the two codes match, then tap **Allow**.
+
+A request expires after 5 minutes. Each device address can have 3 requests waiting, and the
+computer holds 10 in total.
+
+**Manage devices**
+
+- Each approved device gets its own token. The device keeps it in the browser (`localStorage`);
+  this computer keeps only a hash of it.
+- It lasts `device_days`. After that, or if you revoke it, the device sees the pairing screen again.
+- Revoke one device in **Settings → Access**, or all of them with **Sign out all panels**.
+- Only the panel on this computer can approve, deny or revoke devices.
+
+**What is checked**
+
+- The `Host` header must be one of this computer's addresses, its hostname, `hostname.local`, or a
+  name in `hosts`. That blocks DNS-rebinding. If the request has an `Origin`, it must match too.
+- Failed attempts are rate-limited per address.
+- The log records every request for access, approval, denial and revoke, and each device's first sign-in per daemon run. Refused attempts are logged too, at most once a minute per address and reason. Ordinary panel use isn't logged.
+
+**Read this before you turn it on**
+
+- The connection is plain HTTP. On a network you don't trust, someone watching the traffic could
+  steal a device's sign-in. Use it on a trusted home network or over a VPN. Any VPN works
+  (WireGuard, for example), but none is required.
+- An approved device can do everything the panel can: run commands on this computer and control
+  OBS and your Twitch channel. Approve only your own devices.
+- `listen: "0.0.0.0"` ("every address") also exposes the port on any other network this computer
+  joins. Set `listen` to one address of this computer to limit it.
+
+**If it doesn't work**
+
+- **The page doesn't load:** check that remote access is saved as on, that you use the remote
+  port and not `editor.port`, and that your firewall allows it. If `listen` is one address, use
+  that address. The card shows the URLs the daemon is listening on.
+- **The page says the host isn't allowed:** you typed a name the daemon doesn't know. Use one of
+  the card's URLs, or add the name to `hosts`.
+- **The code never shows up on this computer:** open the panel here (a local panel has to be
+  open to show the pop-up), then look under **Settings → Access** and check your desktop
+  notifications. Requests expire after 5 minutes, so ask again if it timed out.
+- **Anything else:** read the log with `journalctl --user -u ultimate-streaming -f`. It records
+  every request, approval, denial and revoke.
 
 ---
 
@@ -471,7 +557,7 @@ that act on your stream, like changing the OBS background color or your room lig
 posts as your linked account. To start:
 
 1. [Link Twitch](#link-twitch), re-linking once if you linked before the bot existed.
-2. Open **Twitch Bot** (press `4`) and turn it on with its switch. It's off by default.
+2. Open **Twitch → Bot** (press `3`, then the **Bot** tab) and turn it on with its switch. It's off by default.
 
 The bot's EventSub connection also runs when [Twitch alerts](#twitch-alerts) are on, even if
 the bot is off.
@@ -570,7 +656,7 @@ points spent, and records first/last seen and their name, but not message text. 
   `stats: {include_broadcaster: true}` to count yourself. Setting `exclude` replaces the
   list; up to 200 logins.
 - **To turn it off:** `stats: {enabled: false}`, which also disables `!stats` / `!top10`.
-- **To reset:** the Twitch Bot view clears **this stream** or **everything**. Clearing
+- **To reset:** the Bot tab clears **this stream** or **everything**. Clearing
   everything first copies a SQLite database to `backups/chatstats-YYYYMMDD-HHMMSS.db` (newest
   10 kept); back up any other database yourself.
 - **Another database:** set `twitch_bot.database_url` to a SQLAlchemy URL, e.g.
@@ -706,7 +792,7 @@ not five.
 
 The scene builder (`python3 obs/build_scenes.py`) adds a text source called **Alert**: top
 center of the Screen, Game and Camera scenes, and a strip at the bottom left of BRB. If you
-keep your own scenes, either open **Settings → Existing setup** and add the alerts text, or
+keep your own scenes, either open **Settings → General → Existing setup** and add the alerts text, or
 add a **Text (FreeType 2)** source yourself, check **Read from file** and pick
 `~/.config/ultimate-streaming/overlay/alert.txt`. The file is empty between alerts, so the
 source is invisible when nothing is happening.
@@ -904,7 +990,7 @@ of every layout to `./preview/`.
 
 ## Stream Deck models
 
-Each deck uses the first of these that exists: the layout chosen for it in Settings → Decks
+Each deck uses the first of these that exists: the layout chosen for it in Settings → General → Decks
 (`devices.<serial>.layout`), `layouts:` by model name, `layouts:` by key grid
 (`COLUMNSxROWS`), the top-level `pages:`, or else the biggest grid layout that fits, centered.
 
@@ -932,7 +1018,7 @@ To add dials to a page on a + model (tapping the touch strip above a dial presse
 ### Several decks
 
 Every deck you plug in is driven at once, each with its own page and brightness. To set a
-deck's name, layout, start page and brightness, use Settings → **Decks** (**Identify** flashes
+deck's name, layout, start page and brightness, use Settings → General → **Decks** (**Identify** flashes
 a deck's keys so you can tell which is which), or the config:
 
 ```yaml
@@ -1266,7 +1352,7 @@ python3 tools/devserver.py --screenshot /tmp/live.png --view live --size 1400x90
 The dev server runs the real daemon on fake decks, with a config copy and its own tokens in
 a throwaway folder, and prints the panel's URL with its token. Key actions are only logged
 and OBS is unreachable unless you pass `--live`, which is also needed for `--state` pointing
-at your real state folder. `--screenshot PNG` opens `--view live|deck|twitch|bot|obs|settings`
+at your real state folder. `--screenshot PNG` opens `--view live|deck|twitch|obs|settings` (or `bot`, which opens Twitch's Bot tab)
 in headless Firefox, waits `--wait` seconds, saves and exits. `#theme=light` or `#theme=dark`
 on the URL overrides the stored theme.
 
@@ -1274,9 +1360,11 @@ on the URL overrides the stored theme.
 editor/index.html    the shell: navigation, status chips, one <section> per view
 editor/style.css     design system: color tokens (dark and light), type, buttons, forms, modals
 editor/css/*.css     per-view styles
+editor/css/settings.css  Settings tabs and the Remote access card
 editor/js/main.js    router (hash per view, lazy mount), theme, status chips, event stream, shortcuts
 editor/js/api.js     token handling, api() fetch wrapper, the SSE connection and on(type, fn)
 editor/js/ui.js      helpers: h() element builder, icons, chips, toasts, modals
+editor/js/tabs.js      tab groups for Twitch and Settings
 editor/js/*.js       views: live.js, app.js (Deck and Settings), twitch.js, twitchbot.js, obs.js, backups.js
 ```
 
@@ -1287,7 +1375,7 @@ set `textContent`, never HTML. CI enforces this, and the CSP is `script-src 'sel
 ### HTTP API
 
 Every `/api/` call except `/api/session` needs the `X-Deck-Token` header, a `Host` of the panel's own address, and a
-matching `Origin` if one is sent. POST bodies are JSON, 4 MB at most; errors are JSON with an
+matching `Origin` if one is sent. On the remote listener (see [above](#using-the-panel-from-another-device)), the token is the one the device got when you approved it, and the `Host` must be one of the computer's names. Two routes there need no token and are rate-limited: `POST /api/pair/start` asks for access and `POST /api/pair/poll` checks the answer. `POST /api/remote/decide` (allow or deny a request) and `POST /api/remote/revoke` (revoke a device) work from the local panel only. POST bodies are JSON, 4 MB at most; errors are JSON with an
 HTTP status. Routes marked *deck* take an optional `deck` (serial); without it they act on the
 first deck.
 

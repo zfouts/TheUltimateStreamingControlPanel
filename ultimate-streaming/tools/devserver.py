@@ -205,8 +205,8 @@ def main():
     ap.add_argument("--config", help="config.yaml to use (default: a sandboxed copy of config.example.yaml)")
     ap.add_argument("--state", help="state dir for tokens etc. (default: a temp folder; your real one needs --live)")
     ap.add_argument("--screenshot", metavar="PNG", help="save a screenshot of the panel and exit")
-    ap.add_argument("--view", default="live", help="view to screenshot: live, deck, twitch, bot (Twitch Bot), obs, settings; "
-                         "add &theme=light for the light theme, e.g. --view 'bot&theme=light'")
+    ap.add_argument("--view", default="live", help="view to screenshot: live, deck, twitch, bot, announce, obs, settings, discord; "
+                         "extra hash params can follow, e.g. --view 'settings&tab=obs' or --view 'bot&theme=light'")
     ap.add_argument("--size", default="1400x900", help="screenshot window size")
     ap.add_argument("--wait", type=float, default=4.0, help="seconds to let the page load before the screenshot")
     ap.add_argument("--live", action="store_true",
